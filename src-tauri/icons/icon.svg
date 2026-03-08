@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f1a2e"/>
+      <stop offset="100%" style="stop-color:#0a1628"/>
+    </linearGradient>
+    <linearGradient id="check" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5ee6a0"/>
+      <stop offset="100%" style="stop-color:#2dbf6e"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5ee6a0;stop-opacity:0.25"/>
+      <stop offset="100%" style="stop-color:#2dbf6e;stop-opacity:0"/>
+    </linearGradient>
+    <linearGradient id="sparkleGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a0ffd0;stop-opacity:0.9"/>
+      <stop offset="100%" style="stop-color:#5ee6a0;stop-opacity:0.7"/>
+    </linearGradient>
+    <linearGradient id="sparkleWhite" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.7"/>
+      <stop offset="100%" style="stop-color:#b0ffd8;stop-opacity:0.4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Deep navy background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228" fill="url(#bg)"/>
+
+  <!-- Soft green ambient glow behind checkmark -->
+  <circle cx="480" cy="520" r="260" fill="url(#glow)"/>
+
+  <!-- Checkmark - bold, focused, green -->
+  <path d="M320 520 L450 650 L710 370"
+        fill="none" stroke="url(#check)" stroke-width="72"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Main sparkle (4-point star) - top right, green-white -->
+  <path d="M730 240 L744 298 L802 312 L744 326 L730 384 L716 326 L658 312 L716 298 Z"
+        fill="url(#sparkleGreen)"/>
+
+  <!-- Medium sparkle - upper area -->
+  <path d="M570 170 L578 200 L608 208 L578 216 L570 246 L562 216 L532 208 L562 200 Z"
+        fill="url(#sparkleWhite)"/>
+
+  <!-- Small sparkle - right side -->
+  <path d="M810 430 L816 452 L838 458 L816 464 L810 486 L804 464 L782 458 L804 452 Z"
+        fill="url(#sparkleWhite)" opacity="0.6"/>
+
+  <!-- Tiny sparkle - bottom right -->
+  <path d="M750 560 L754 574 L768 578 L754 582 L750 596 L746 582 L732 578 L746 574 Z"
+        fill="#5ee6a0" opacity="0.4"/>
+
+  <!-- Dot sparkles scattered -->
+  <circle cx="630" cy="165" r="6" fill="#a0ffd0" opacity="0.5"/>
+  <circle cx="820" cy="320" r="5" fill="#5ee6a0" opacity="0.4"/>
+  <circle cx="775" cy="195" r="4" fill="#ffffff" opacity="0.35"/>
+  <circle cx="850" cy="500" r="3" fill="#a0ffd0" opacity="0.3"/>
+  <circle cx="670" cy="130" r="3" fill="#ffffff" opacity="0.25"/>
+</svg>
