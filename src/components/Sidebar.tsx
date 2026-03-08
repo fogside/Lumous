@@ -279,6 +279,24 @@ export function Sidebar({
         </button>
       </div>
 
+      {/* Wizard watermark — decorative background */}
+      <div style={{
+        position: "absolute",
+        bottom: 44,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: 340,
+        height: 340,
+        backgroundImage: "url(/wizard-watermark.png)",
+        backgroundSize: "contain",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center bottom",
+        opacity: 0.18,
+        pointerEvents: "none",
+        maskImage: "linear-gradient(to bottom, transparent 0%, black 30%)",
+        WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 30%)",
+      }} />
+
       {/* Sync footer — only in expanded view */}
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "16px 20px" }}>
         <SyncStatus

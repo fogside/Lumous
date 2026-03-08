@@ -6,7 +6,7 @@ import {
   DragOverEvent,
   DragStartEvent,
   DragOverlay,
-  closestCorners,
+  closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
@@ -15,6 +15,8 @@ import { Board, Card as CardType } from "../lib/types";
 import { useBoard } from "../hooks/useBoard";
 import { Column } from "./Column";
 import { CardModal } from "./CardModal";
+import { SparkleEffect, SparkleEvent } from "./SparkleEffect";
+import { WizardCelebration } from "./WizardCelebration";
 
 interface Props {
   initialBoard: Board;
@@ -104,9 +106,13 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
   const { board, moveCard, addCard, updateCard, deleteCard } = useBoard(initialBoard);
   const [editingCard, setEditingCard] = useState<{ card: CardType; columnId: string } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [dragSourceCol, setDragSourceCol] = useState<string | null>(null);
+  const [sparkleEvent, setSparkleEvent] = useState<SparkleEvent | null>(null);
+  const [wizardKey, setWizardKey] = useState(0);
+  const [showWizard, setShowWizard] = useState(false);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 3 } })
   );
 
   const findColumnForCard = useCallback(
@@ -118,7 +124,10 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
   );
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(String(event.active.id));
+    const cardId = String(event.active.id);
+    setActiveId(cardId);
+    const col = findColumnForCard(cardId);
+    setDragSourceCol(col?.id ?? null);
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -154,6 +163,28 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
     const activeCardId = String(active.id);
     const overId = String(over.id);
 
+    // Fire sparkles if card moved to a different column
+    const currentCol = findColumnForCard(activeCardId);
+    if (currentCol && dragSourceCol && currentCol.id !== dragSourceCol) {
+      const rect = (event.activatorEvent.target as HTMLElement)?.getBoundingClientRect?.();
+      const overRect = document.querySelector(`[data-column-id="${currentCol.id}"]`)?.getBoundingClientRect();
+      const ref = overRect || rect;
+      if (ref) {
+        setSparkleEvent({
+          x: ref.left + ref.width / 2,
+          y: ref.top + 60,
+          key: Date.now(),
+        });
+      }
+      // Wizard celebration when completing a task
+      if (currentCol.id === "completed") {
+        setWizardKey((k) => k + 1);
+        setShowWizard(true);
+        setTimeout(() => setShowWizard(false), 3000);
+      }
+    }
+    setDragSourceCol(null);
+
     if (activeCardId === overId) return;
 
     const col = findColumnForCard(activeCardId);
@@ -179,6 +210,7 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
         height: "100%",
         transition: "background-color 0.3s",
         backgroundColor: board.backgroundColor,
+        position: "relative",
       }}
     >
       {/* Board header — draggable (outside DndContext, so always works) */}
@@ -193,7 +225,7 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
       <div style={{ flex: 1, overflowX: "auto", padding: "0 40px 40px 40px" }}>
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
@@ -234,6 +266,9 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
           </DragOverlay>
         </DndContext>
       </div>
+
+      <SparkleEffect event={sparkleEvent} />
+      <WizardCelebration key={wizardKey} visible={showWizard} />
 
       {/* Edit modal */}
       {editingCard && (

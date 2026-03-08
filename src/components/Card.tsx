@@ -57,11 +57,12 @@ export function Card({ card, onClick, faded }: Props) {
           {card.description}
         </p>
       )}
-      {faded && card.completedAt && (
-        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", marginTop: 8, display: "block", fontWeight: 500 }}>
-          {new Date(card.completedAt).toLocaleDateString()}
-        </span>
-      )}
+      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 8, display: "block", fontWeight: 400 }}>
+        {faded && card.completedAt
+          ? `Done ${new Date(card.completedAt).toLocaleDateString()}`
+          : new Date(card.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+        }
+      </span>
     </div>
   );
 }

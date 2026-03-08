@@ -17,6 +17,7 @@ export function Column({ column, cards, onAddCard, onCardClick }: Props) {
 
   return (
     <div
+      data-column-id={column.id}
       style={{
         display: "flex",
         flexDirection: "column",
