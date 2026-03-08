@@ -47,6 +47,8 @@ src/
     SyncSettingsModal.tsx    — GitHub repo URL + sync interval
     SyncStatus.tsx           — Sync state indicator
     ConfirmDialog.tsx        — Reusable confirmation dialog
+    SparkleEffect.tsx        — Gold sparkle burst on cross-column drag
+    WizardCelebration.tsx    — Wizard animation on task completion
   hooks/
     useBoard.ts              — useReducer for single board state, auto-save
     useBoards.ts             — Meta/board list management, active board
@@ -75,8 +77,10 @@ All components use **inline styles**, not Tailwind utility classes. This was a d
 
 ### Drag and Drop (@dnd-kit)
 - `DndContext` wraps columns area in `BoardView.tsx`
-- `PointerSensor` with `distance: 5` activation constraint
+- `PointerSensor` with `distance: 3` activation constraint
+- `closestCenter` collision detection (forgiving drop targets)
 - Cards use `useSortable`, columns use `useDroppable`
+- Columns have `data-column-id` attribute for sparkle positioning
 - Moving to "Completed" column auto-sets `completedAt` timestamp
 
 ### Data Persistence
@@ -101,6 +105,25 @@ All components use **inline styles**, not Tailwind utility classes. This was a d
 - **Cargo not found**: `export PATH="$HOME/.cargo/bin:$PATH"`
 - **Icon not updating in dev**: Icons only appear in production builds (`.dmg`)
 - **Window not dragging**: Check `core:window:allow-start-dragging` in capabilities
+
+## Visual Effects & Animations
+
+### Sparkle Effect (`SparkleEffect.tsx`)
+Gold 4-pointed star particles burst when dragging cards between columns. Triggered in `BoardView.handleDragEnd` when source and destination columns differ.
+
+### Wizard Celebration (`WizardCelebration.tsx`)
+Golden wizard appears when a task is moved to the Completed column. Randomly picks one of 4 entry positions (bottom, top, left, right) — never the same twice in a row. Sparkles stream from the wand tip diagonally across the board.
+
+### Adding a New Celebration Image
+1. **Create transparent PNG**: Place the image in `public/`. Use Python Pillow to extract the subject from a source image with background removal (see `wizard-gold.png` as example — extracted from the app icon by detecting olive-green background pixels via R/G ratio and making them transparent).
+2. **Use `drop-shadow` for glow** — never `box-shadow` or radial-gradient divs, as those render as rectangles. `filter: drop-shadow(...)` follows the image's alpha contour.
+3. **Rotation + flip for side entries**: The image enters head-first from each edge:
+   - Bottom: no transform needed
+   - Top: `rotate(180deg)` (upside down)
+   - Right: `rotate(-90deg) scaleX(-1)` — head points left, wand flipped to correct side
+   - Left: `rotate(90deg) scaleX(-1)` — head points right, wand flipped to correct side
+4. **Sparkle anchors**: Position `wandAnchor` CSS to match where the wand tip lands after rotation. Use `top: calc(50% ± offset)` relative to the container. Test each variant visually.
+5. **Image source files**: `public/wizard-gold.png` (celebration), `public/wizard-watermark.png` (sidebar watermark), `src-tauri/icons/` (app icon).
 
 ## Design Philosophy
 - Minimalist, dark UI with warm accent colors

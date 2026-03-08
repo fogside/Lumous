@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon-options/wizard2-olive-gold.png" width="128" height="128" alt="WandDo icon" />
+  <img src="src-tauri/icons/128x128.png" width="128" height="128" alt="WandDo icon" />
 </p>
 
 <h1 align="center">WandDo</h1>
