@@ -3,7 +3,7 @@ import { useBoards } from "./hooks/useBoards";
 import { useBoard } from "./hooks/useBoard";
 import { useSync } from "./hooks/useSync";
 import { useWindowSize } from "./hooks/useWindowSize";
-import { loadBoard } from "./lib/storage";
+import { Board } from "./lib/types";
 import { Sidebar } from "./components/Sidebar";
 import { BoardView } from "./components/BoardView";
 import { CompactView } from "./components/CompactView";
@@ -27,7 +27,13 @@ export default function App() {
     loading,
   } = useBoards();
 
-  const { board, moveCard, addCard, updateCard, deleteCard, flushSave } = useBoard(activeBoard);
+  // Sync live board changes back to the boards record so sidebar/shadow board stay current
+  // and switching back to a board shows its latest state
+  const handleBoardChanged = useCallback((board: Board) => {
+    refreshBoard(board);
+  }, [refreshBoard]);
+
+  const { board, moveCard, addCard, updateCard, deleteCard } = useBoard(activeBoard, handleBoardChanged);
   const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings);
   const { mode } = useWindowSize();
 
@@ -37,17 +43,6 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [shadowBoardId, setShadowBoardId] = useState<string | null>(null);
 
-  // Save current board to disk, reload target board, then switch
-  const switchBoard = useCallback(async (id: string) => {
-    await flushSave();
-    try {
-      const fresh = await loadBoard(id);
-      refreshBoard(fresh);
-    } catch { /* board file missing, use in-memory version */ }
-    setActiveBoardId(id);
-    setShadowBoardId(null);
-  }, [flushSave, refreshBoard, setActiveBoardId]);
-
   if (loading) {
     return (
       <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0c0c14" }}>
@@ -56,7 +51,7 @@ export default function App() {
     );
   }
 
-  // Merge active board's live state so sidebar + shadow board see real-time updates
+  // Use boards record directly — it's kept in sync via onBoardChanged callback
   const allBoards = board && activeBoardId ? { ...boards, [activeBoardId]: board } : boards;
 
   const editingBoard = editingBoardId ? allBoards[editingBoardId] : null;
@@ -74,7 +69,7 @@ export default function App() {
           boards={allBoards}
           boardOrder={meta?.boardOrder || []}
           activeBoardId={activeBoardId}
-          onSelectBoard={switchBoard}
+          onSelectBoard={(id) => { setActiveBoardId(id); setShadowBoardId(null); }}
           onNewBoard={() => setShowNewBoard(true)}
           onRemoveBoard={removeBoard}
           onEditBoard={setEditingBoardId}

@@ -86,43 +86,57 @@ function boardReducer(state: Board | null, action: Action): Board | null {
   }
 }
 
-export function useBoard(initialBoard: Board | null) {
+export function useBoard(
+  initialBoard: Board | null,
+  onBoardChanged?: (board: Board) => void,
+) {
   const [board, dispatch] = useReducer(boardReducer, initialBoard);
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const isInitialLoad = useRef(true);
   const boardRef = useRef<Board | null>(null);
+  const prevBoardIdRef = useRef<string | null>(initialBoard?.id || null);
+  const dirtyRef = useRef(false);
+
+  // Always keep ref in sync with latest reducer state
   boardRef.current = board;
 
+  // When the board being edited changes (switch boards), flush save the previous one
   useEffect(() => {
+    const newId = initialBoard?.id || null;
+    const prevId = prevBoardIdRef.current;
+
+    if (newId !== prevId) {
+      // Flush save the previous board before switching
+      clearTimeout(saveTimeout.current);
+      if (dirtyRef.current && boardRef.current) {
+        saveBoard(boardRef.current).catch(console.error);
+      }
+      dirtyRef.current = false;
+      prevBoardIdRef.current = newId;
+    }
+
     if (initialBoard) {
-      isInitialLoad.current = true;
       dispatch({ type: "SET_BOARD", board: initialBoard });
     }
   }, [initialBoard]);
 
-  // Auto-save on changes (debounced)
+  // Auto-save on changes (debounced) + sync back to parent
   useEffect(() => {
     if (!board) return;
-    if (isInitialLoad.current) {
-      isInitialLoad.current = false;
-      return;
-    }
+    // Skip saving when board was just set from initialBoard
+    if (board === initialBoard) return;
+
+    dirtyRef.current = true;
+
+    // Notify parent of live changes (for sidebar, shadow board, etc.)
+    onBoardChanged?.(board);
+
     clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
       saveBoard(board).catch(console.error);
+      dirtyRef.current = false;
     }, 500);
     return () => clearTimeout(saveTimeout.current);
-  }, [board]);
-
-  // Flush save: saves current board immediately, returns the saved board
-  const flushSave = useCallback(async () => {
-    clearTimeout(saveTimeout.current);
-    const current = boardRef.current;
-    if (current) {
-      await saveBoard(current);
-    }
-    return current;
-  }, []);
+  }, [board, initialBoard, onBoardChanged]);
 
   const moveCard = useCallback(
     (cardId: string, fromCol: string, toCol: string, toIndex: number) => {
@@ -143,5 +157,5 @@ export function useBoard(initialBoard: Board | null) {
     dispatch({ type: "DELETE_CARD", cardId, columnId });
   }, []);
 
-  return { board, dispatch, moveCard, addCard, updateCard, deleteCard, flushSave };
+  return { board, dispatch, moveCard, addCard, updateCard, deleteCard };
 }
