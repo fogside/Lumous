@@ -33,11 +33,19 @@ WandDo is a native macOS desktop app for managing tasks across beautiful Kanban 
 - **Tiny footprint** — ~5MB native binary, instant launch
 - **Frameless beauty** — custom dark UI, no system chrome
 
+### Install
+
+Download the latest `.dmg` from [Releases](https://github.com/fogside/WandDo/releases), open it, and drag **WandDo** to your Applications folder. No dependencies required — everything is bundled.
+
+> **Note:** On first launch, macOS may show a security warning. Go to **System Settings → Privacy & Security** and click "Open Anyway".
+
+Data is stored locally in `~/Library/Application Support/com.zenja.todo/`. GitHub sync is optional — the app works fully offline out of the box.
+
 ### Stack
 
 Tauri v2 (Rust) · React · TypeScript · @dnd-kit
 
-### Getting Started
+### Development
 
 ```bash
 # Prerequisites: Node 20+, Rust
@@ -50,7 +58,7 @@ npm run tauri dev
 
 ```bash
 npm run tauri build
-# → outputs .dmg in src-tauri/target/release/bundle/
+# → outputs .dmg in src-tauri/target/release/bundle/dmg/
 ```
 
 ---
