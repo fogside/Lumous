@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Board, Meta } from "../lib/types";
 import { SyncStatus } from "./SyncStatus";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { CompletionHeatmap } from "./CompletionHeatmap";
 
 function startWindowDrag(e: React.MouseEvent) {
   if (e.button !== 0) return;
@@ -29,6 +30,8 @@ interface Props {
   onOpenSyncSettings: () => void;
   collapsed: boolean;
   onToggle: () => void;
+  shadowBoardId: string | null;
+  onToggleShadowBoard: (id: string | null) => void;
 }
 
 export function Sidebar({
@@ -47,6 +50,8 @@ export function Sidebar({
   onOpenSyncSettings,
   collapsed,
   onToggle,
+  shadowBoardId,
+  onToggleShadowBoard,
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const deletingBoard = confirmDelete ? boards[confirmDelete] : null;
@@ -193,67 +198,145 @@ export function Sidebar({
           const board = boards[id];
           if (!board) return null;
           const isActive = id === activeBoardId;
+          const isShadowOpen = shadowBoardId === id;
+          const hasLog = (board.completionLog?.length || 0) > 0;
           return (
-            <div
-              key={id}
-              style={{ display: "flex", alignItems: "center", marginBottom: 4, gap: 4 }}
-            >
-              <button
-                onClick={() => onSelectBoard(id)}
-                onContextMenu={(e) => { e.preventDefault(); onEditBoard(id); }}
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  padding: "12px 16px",
-                  borderRadius: 12,
-                  textAlign: "left",
-                  background: isActive ? "rgba(255,255,255,0.1)" : "transparent",
-                  color: isActive ? "white" : "rgba(255,255,255,0.45)",
-                  border: "none",
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                  minWidth: 0,
-                }}
-              >
-                <span
+            <div key={id} style={{ marginBottom: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <button
+                  onClick={() => onSelectBoard(id)}
+                  onContextMenu={(e) => { e.preventDefault(); onEditBoard(id); }}
                   style={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: 6,
-                    flexShrink: 0,
-                    backgroundColor: board.backgroundColor,
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "12px 16px",
+                    borderRadius: 12,
+                    textAlign: "left",
+                    background: isActive ? "rgba(255,255,255,0.1)" : "transparent",
+                    color: isActive ? "white" : "rgba(255,255,255,0.45)",
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    minWidth: 0,
                   }}
-                />
-                <span style={{ fontSize: 15, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {board.title}
-                </span>
-              </button>
-              {/* Delete button — visible on hover via CSS-in-JS workaround: always render, show on active */}
-              <button
-                onClick={() => setConfirmDelete(id)}
-                title="Delete board"
-                style={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "rgba(255,255,255,0.35)",
-                  fontSize: 18,
-                  fontWeight: 300,
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                  opacity: isActive ? 1 : 0,
-                  transition: "opacity 0.15s",
-                }}
-              >
-                ×
-              </button>
+                >
+                  <span
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: 6,
+                      flexShrink: 0,
+                      backgroundColor: board.backgroundColor,
+                    }}
+                  />
+                  <span style={{ fontSize: 15, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                    {board.title}
+                  </span>
+                  {/* Shadow board toggle icon */}
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleShadowBoard(isShadowOpen ? null : id);
+                    }}
+                    title="Completion history"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 22,
+                      height: 22,
+                      borderRadius: 6,
+                      flexShrink: 0,
+                      color: isShadowOpen ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.15)",
+                      transition: "all 0.15s",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <rect x="1" y="7" width="2" height="6" rx="0.5" fill="currentColor"/>
+                      <rect x="4.5" y="4" width="2" height="9" rx="0.5" fill="currentColor"/>
+                      <rect x="8" y="5.5" width="2" height="7.5" rx="0.5" fill="currentColor"/>
+                      <rect x="11.5" y="2" width="2" height="11" rx="0.5" fill="currentColor" opacity="0.6"/>
+                    </svg>
+                  </span>
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(id)}
+                  title="Delete board"
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "rgba(255,255,255,0.35)",
+                    fontSize: 18,
+                    fontWeight: 300,
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                    opacity: isActive ? 1 : 0,
+                    transition: "opacity 0.15s",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Shadow board — completion heatmap with git-tree connector */}
+              {isShadowOpen && (
+                <div style={{ display: "flex", paddingLeft: 16, marginTop: -2, marginBottom: 4 }}>
+                  {/* Git tree connector */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 16, flexShrink: 0 }}>
+                    <div style={{
+                      width: 1,
+                      height: 10,
+                      background: "rgba(255,255,255,0.12)",
+                    }} />
+                    <div style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      border: "1.5px solid rgba(255,255,255,0.2)",
+                      background: "#0c0c14",
+                      flexShrink: 0,
+                    }} />
+                    <div style={{
+                      width: 1,
+                      flex: 1,
+                      background: "rgba(255,255,255,0.06)",
+                    }} />
+                  </div>
+                  {/* Heatmap content */}
+                  <div style={{
+                    flex: 1,
+                    padding: "6px 10px 8px 8px",
+                    borderRadius: 8,
+                    background: "rgba(255,255,255,0.03)",
+                    overflow: "hidden",
+                  }}>
+                    {hasLog ? (
+                      <CompletionHeatmap
+                        completionLog={board.completionLog!}
+                        accentColor={board.backgroundColor}
+                      />
+                    ) : (
+                      <div style={{
+                        fontSize: 11,
+                        color: "rgba(255,255,255,0.15)",
+                        fontWeight: 500,
+                        padding: "8px 0",
+                      }}>
+                        No completions yet
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}

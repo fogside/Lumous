@@ -18,7 +18,18 @@ export function useBoards() {
         const loaded: Record<string, Board> = {};
         for (const id of m.boardOrder) {
           try {
-            loaded[id] = await loadBoard(id);
+            const board = await loadBoard(id);
+            // Backfill completionLog from existing completed cards
+            if (!board.completionLog) {
+              const backfilled = Object.values(board.cards)
+                .filter((c) => c.completedAt)
+                .map((c) => c.completedAt!);
+              if (backfilled.length > 0) {
+                board.completionLog = backfilled;
+                await saveBoard(board);
+              }
+            }
+            loaded[id] = board;
           } catch {
             // Board file missing, skip
           }

@@ -35,13 +35,16 @@ function boardReducer(state: Board | null, action: Action): Board | null {
       });
 
       const cards = { ...state.cards };
-      if (toCol === "completed" && cards[cardId]) {
-        cards[cardId] = { ...cards[cardId], completedAt: new Date().toISOString() };
+      let completionLog = state.completionLog || [];
+      if (toCol === "completed" && fromCol !== "completed" && cards[cardId]) {
+        const now = new Date().toISOString();
+        cards[cardId] = { ...cards[cardId], completedAt: now };
+        completionLog = [...completionLog, now];
       } else if (fromCol === "completed" && toCol !== "completed" && cards[cardId]) {
         cards[cardId] = { ...cards[cardId], completedAt: null };
       }
 
-      return { ...state, columns, cards };
+      return { ...state, columns, cards, completionLog };
     }
 
     case "ADD_CARD": {

@@ -6,6 +6,7 @@ import { useWindowSize } from "./hooks/useWindowSize";
 import { Sidebar } from "./components/Sidebar";
 import { BoardView } from "./components/BoardView";
 import { CompactView } from "./components/CompactView";
+import { ShadowBoardView } from "./components/ShadowBoardView";
 import { BoardSettingsModal } from "./components/BoardSettingsModal";
 import { NewBoardModal } from "./components/NewBoardModal";
 import { SyncSettingsModal } from "./components/SyncSettingsModal";
@@ -32,6 +33,7 @@ export default function App() {
   const [showNewBoard, setShowNewBoard] = useState(false);
   const [showSyncSettings, setShowSyncSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [shadowBoardId, setShadowBoardId] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -41,7 +43,10 @@ export default function App() {
     );
   }
 
-  const editingBoard = editingBoardId ? boards[editingBoardId] : null;
+  // Merge active board's live state so sidebar + shadow board see real-time updates
+  const allBoards = board && activeBoardId ? { ...boards, [activeBoardId]: board } : boards;
+
+  const editingBoard = editingBoardId ? allBoards[editingBoardId] : null;
   const isCompact = mode === "compact";
   const isMedium = mode === "medium";
 
@@ -53,10 +58,10 @@ export default function App() {
       {/* Hide sidebar entirely in compact mode */}
       {!isCompact && (
         <Sidebar
-          boards={boards}
+          boards={allBoards}
           boardOrder={meta?.boardOrder || []}
           activeBoardId={activeBoardId}
-          onSelectBoard={setActiveBoardId}
+          onSelectBoard={(id) => { setActiveBoardId(id); setShadowBoardId(null); }}
           onNewBoard={() => setShowNewBoard(true)}
           onRemoveBoard={removeBoard}
           onEditBoard={setEditingBoardId}
@@ -68,11 +73,18 @@ export default function App() {
           onOpenSyncSettings={() => setShowSyncSettings(true)}
           collapsed={effectiveCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          shadowBoardId={shadowBoardId}
+          onToggleShadowBoard={setShadowBoardId}
         />
       )}
 
       <main style={{ flex: 1, overflow: "hidden" }}>
-        {board ? (
+        {shadowBoardId && allBoards[shadowBoardId] ? (
+          <ShadowBoardView
+            board={allBoards[shadowBoardId]}
+            onClose={() => setShadowBoardId(null)}
+          />
+        ) : board ? (
           isCompact ? (
             <CompactView
               board={board}

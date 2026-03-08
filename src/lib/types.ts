@@ -18,6 +18,7 @@ export interface Board {
   backgroundColor: string;
   columns: Column[];
   cards: Record<string, Card>;
+  completionLog?: string[]; // ISO timestamps of each task completion
 }
 
 export interface Settings {

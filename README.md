@@ -25,6 +25,9 @@ WandDo is a native macOS desktop app for managing tasks across beautiful Kanban 
 - **Boards with personality** — multiple boards, each with its own color and vibe
 - **Drag & drop** — move cards between columns with a flick of the wrist
 - **Four columns** — Todo, Today, In Progress, Completed
+- **Shadow Board** — per-board analytics dashboard with completion/creation heatmaps, daily plots, streaks, and interactive hover tooltips
+- **Responsive layout** — full board (>800px), tabbed medium mode (450-800px), compact Today checklist (<450px)
+- **Celebrations** — golden sparkles on drag, wizard celebration when completing tasks
 - **Offline-first** — works without internet, always
 - **GitHub sync** — push your boards to a repo with one click
 - **Tiny footprint** — ~5MB native binary, instant launch
