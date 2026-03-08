@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useBoards } from "./hooks/useBoards";
 import { useBoard } from "./hooks/useBoard";
 import { useSync } from "./hooks/useSync";
 import { useWindowSize } from "./hooks/useWindowSize";
+import { loadBoard } from "./lib/storage";
 import { Sidebar } from "./components/Sidebar";
 import { BoardView } from "./components/BoardView";
 import { CompactView } from "./components/CompactView";
@@ -21,11 +22,12 @@ export default function App() {
     addBoard,
     removeBoard,
     updateBoardMeta,
+    refreshBoard,
     updateSettings,
     loading,
   } = useBoards();
 
-  const { board, moveCard, addCard, updateCard, deleteCard } = useBoard(activeBoard);
+  const { board, moveCard, addCard, updateCard, deleteCard, flushSave } = useBoard(activeBoard);
   const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings);
   const { mode } = useWindowSize();
 
@@ -34,6 +36,17 @@ export default function App() {
   const [showSyncSettings, setShowSyncSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [shadowBoardId, setShadowBoardId] = useState<string | null>(null);
+
+  // Save current board to disk, reload target board, then switch
+  const switchBoard = useCallback(async (id: string) => {
+    await flushSave();
+    try {
+      const fresh = await loadBoard(id);
+      refreshBoard(fresh);
+    } catch { /* board file missing, use in-memory version */ }
+    setActiveBoardId(id);
+    setShadowBoardId(null);
+  }, [flushSave, refreshBoard, setActiveBoardId]);
 
   if (loading) {
     return (
@@ -61,7 +74,7 @@ export default function App() {
           boards={allBoards}
           boardOrder={meta?.boardOrder || []}
           activeBoardId={activeBoardId}
-          onSelectBoard={(id) => { setActiveBoardId(id); setShadowBoardId(null); }}
+          onSelectBoard={switchBoard}
           onNewBoard={() => setShowNewBoard(true)}
           onRemoveBoard={removeBoard}
           onEditBoard={setEditingBoardId}

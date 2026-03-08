@@ -90,6 +90,8 @@ export function useBoard(initialBoard: Board | null) {
   const [board, dispatch] = useReducer(boardReducer, initialBoard);
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
   const isInitialLoad = useRef(true);
+  const boardRef = useRef<Board | null>(null);
+  boardRef.current = board;
 
   useEffect(() => {
     if (initialBoard) {
@@ -112,6 +114,16 @@ export function useBoard(initialBoard: Board | null) {
     return () => clearTimeout(saveTimeout.current);
   }, [board]);
 
+  // Flush save: saves current board immediately, returns the saved board
+  const flushSave = useCallback(async () => {
+    clearTimeout(saveTimeout.current);
+    const current = boardRef.current;
+    if (current) {
+      await saveBoard(current);
+    }
+    return current;
+  }, []);
+
   const moveCard = useCallback(
     (cardId: string, fromCol: string, toCol: string, toIndex: number) => {
       dispatch({ type: "MOVE_CARD", cardId, fromCol, toCol, toIndex });
@@ -131,5 +143,5 @@ export function useBoard(initialBoard: Board | null) {
     dispatch({ type: "DELETE_CARD", cardId, columnId });
   }, []);
 
-  return { board, dispatch, moveCard, addCard, updateCard, deleteCard };
+  return { board, dispatch, moveCard, addCard, updateCard, deleteCard, flushSave };
 }
