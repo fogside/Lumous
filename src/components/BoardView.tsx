@@ -12,18 +12,23 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { Board, Card as CardType } from "../lib/types";
-import { useBoard } from "../hooks/useBoard";
 import { Column } from "./Column";
 import { CardModal } from "./CardModal";
 import { SparkleEffect, SparkleEvent } from "./SparkleEffect";
 import { WizardCelebration } from "./WizardCelebration";
+import type { ViewMode } from "../hooks/useWindowSize";
 
 interface Props {
-  initialBoard: Board;
+  board: Board;
+  moveCard: (cardId: string, fromCol: string, toCol: string, toIndex: number) => void;
+  addCard: (columnId: string, title: string) => void;
+  updateCard: (card: CardType) => void;
+  deleteCard: (cardId: string, columnId: string) => void;
   onTitleChange?: (title: string) => void;
+  mode?: ViewMode;
 }
 
-function EditableTitle({ title, onSave }: { title: string; onSave: (t: string) => void }) {
+function EditableTitle({ title, onSave, small }: { title: string; onSave: (t: string) => void; small?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,6 +45,8 @@ function EditableTitle({ title, onSave }: { title: string; onSave: (t: string) =
     setEditing(false);
   };
 
+  const fontSize = small ? 20 : 28;
+
   if (editing) {
     return (
       <input
@@ -54,7 +61,7 @@ function EditableTitle({ title, onSave }: { title: string; onSave: (t: string) =
         data-no-drag
         style={{
           background: "transparent",
-          fontSize: 28,
+          fontSize,
           fontWeight: 700,
           color: "rgba(255,255,255,0.9)",
           outline: "none",
@@ -75,7 +82,7 @@ function EditableTitle({ title, onSave }: { title: string; onSave: (t: string) =
       data-no-drag
       onClick={() => setEditing(true)}
       style={{
-        fontSize: 28,
+        fontSize,
         fontWeight: 700,
         color: "rgba(255,255,255,0.9)",
         cursor: "text",
@@ -92,7 +99,6 @@ function EditableTitle({ title, onSave }: { title: string; onSave: (t: string) =
   );
 }
 
-// Start window drag on non-interactive areas (no preventDefault — Tauri needs the native event)
 function startWindowDrag(e: React.MouseEvent) {
   if (e.button !== 0) return;
   const target = e.target as HTMLElement;
@@ -102,14 +108,16 @@ function startWindowDrag(e: React.MouseEvent) {
   getCurrentWindow().startDragging();
 }
 
-export function BoardView({ initialBoard, onTitleChange }: Props) {
-  const { board, moveCard, addCard, updateCard, deleteCard } = useBoard(initialBoard);
+export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, onTitleChange, mode = "full" }: Props) {
   const [editingCard, setEditingCard] = useState<{ card: CardType; columnId: string } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dragSourceCol, setDragSourceCol] = useState<string | null>(null);
   const [sparkleEvent, setSparkleEvent] = useState<SparkleEvent | null>(null);
   const [wizardKey, setWizardKey] = useState(0);
   const [showWizard, setShowWizard] = useState(false);
+  const [selectedTab, setSelectedTab] = useState("today");
+
+  const isMedium = mode === "medium";
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 3 } })
@@ -117,7 +125,6 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
 
   const findColumnForCard = useCallback(
     (cardId: string) => {
-      if (!board) return null;
       return board.columns.find((col) => col.cardIds.includes(cardId));
     },
     [board]
@@ -131,7 +138,6 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
   };
 
   const handleDragOver = (event: DragOverEvent) => {
-    if (!board) return;
     const { active, over } = event;
     if (!over) return;
 
@@ -158,12 +164,11 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
     const { active, over } = event;
     setActiveId(null);
 
-    if (!board || !over) return;
+    if (!over) return;
 
     const activeCardId = String(active.id);
     const overId = String(over.id);
 
-    // Fire sparkles if card moved to a different column
     const currentCol = findColumnForCard(activeCardId);
     if (currentCol && dragSourceCol && currentCol.id !== dragSourceCol) {
       const rect = (event.activatorEvent.target as HTMLElement)?.getBoundingClientRect?.();
@@ -176,7 +181,6 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
           key: Date.now(),
         });
       }
-      // Wizard celebration when completing a task
       if (currentCol.id === "completed") {
         setWizardKey((k) => k + 1);
         setShowWizard(true);
@@ -196,9 +200,15 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
     }
   };
 
-  if (!board) return null;
-
   const activeCard = activeId ? board.cards[activeId] : null;
+
+  // In medium mode, filter to selected tab only
+  const visibleColumns = isMedium
+    ? board.columns.filter((c) => c.id === selectedTab)
+    : board.columns;
+
+  const headerPad = isMedium ? "32px 20px 12px 20px" : "44px 48px 28px 48px";
+  const bodyPad = isMedium ? "0 12px 20px 12px" : "0 40px 40px 40px";
 
   return (
     <div
@@ -213,16 +223,71 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
         position: "relative",
       }}
     >
-      {/* Board header — draggable (outside DndContext, so always works) */}
-      <div onMouseDown={startWindowDrag} style={{ padding: "44px 48px 28px 48px" }}>
+      {/* Board header */}
+      <div onMouseDown={startWindowDrag} style={{ padding: headerPad }}>
         <EditableTitle
           title={board.title}
           onSave={(t) => onTitleChange?.(t)}
+          small={isMedium}
         />
       </div>
 
+      {/* Tab bar for medium mode */}
+      {isMedium && (
+        <div
+          style={{
+            display: "flex",
+            gap: 2,
+            padding: "0 12px 8px 12px",
+            overflowX: "auto",
+          }}
+        >
+          {board.columns.map((col) => {
+            const isActive = col.id === selectedTab;
+            const count = col.cardIds.length;
+            return (
+              <button
+                key={col.id}
+                onClick={() => setSelectedTab(col.id)}
+                data-no-drag
+                style={{
+                  flex: 1,
+                  padding: "8px 6px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: isActive ? "rgba(255,255,255,0.12)" : "transparent",
+                  color: isActive ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  whiteSpace: "nowrap",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                }}
+              >
+                {col.title}
+                {count > 0 && (
+                  <span style={{
+                    fontSize: 9,
+                    opacity: 0.5,
+                    fontVariantNumeric: "tabular-nums",
+                  }}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Columns area */}
-      <div style={{ flex: 1, overflowX: "auto", padding: "0 40px 40px 40px" }}>
+      <div style={{ flex: 1, overflowX: isMedium ? "hidden" : "auto", padding: bodyPad }}>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -231,7 +296,7 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
           onDragEnd={handleDragEnd}
         >
           <div style={{ display: "flex", gap: 20, height: "100%" }}>
-            {board.columns.map((column) => {
+            {visibleColumns.map((column) => {
               const cards = column.cardIds
                 .map((id) => board.cards[id])
                 .filter(Boolean);
@@ -270,7 +335,6 @@ export function BoardView({ initialBoard, onTitleChange }: Props) {
       <SparkleEffect event={sparkleEvent} />
       <WizardCelebration key={wizardKey} visible={showWizard} />
 
-      {/* Edit modal */}
       {editingCard && (
         <CardModal
           card={editingCard.card}

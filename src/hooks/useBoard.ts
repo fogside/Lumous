@@ -17,6 +17,12 @@ function boardReducer(state: Board | null, action: Action): Board | null {
     case "MOVE_CARD": {
       const { cardId, fromCol, toCol, toIndex } = action;
       const columns = state.columns.map((col) => {
+        if (fromCol === toCol && col.id === fromCol) {
+          // Same-column reorder
+          const ids = col.cardIds.filter((id) => id !== cardId);
+          ids.splice(toIndex, 0, cardId);
+          return { ...col, cardIds: ids };
+        }
         if (col.id === fromCol) {
           return { ...col, cardIds: col.cardIds.filter((id) => id !== cardId) };
         }
