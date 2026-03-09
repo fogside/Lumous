@@ -126,13 +126,15 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
       {...listeners}
       onClick={onClick}
     >
-      {/* Clipped glow container */}
+      {/* Clipped glow container — isolation forces own compositing layer
+         so overflow:hidden+borderRadius clip survives parent transform */}
       <div style={{
         position: "absolute",
         inset: 0,
-        borderRadius: 12,
+        borderRadius: "inherit",
         overflow: "hidden",
         pointerEvents: "none",
+        isolation: "isolate",
       }}>
         <div style={{
           position: "absolute",

@@ -1,5 +1,25 @@
 # Releases
 
+## Unreleased
+
+- **Drag overlay matches card size** — dragged card overlay now preserves the exact width of the original card instead of using a fixed 240px
+- **Label glow clip fix** — the blurry label glow in the card corner no longer turns square during hover/drag; uses `isolation: isolate` to keep the clip stable under CSS transforms
+
+---
+
+## v1.2.1 — Dark Board Borders
+
+*2026-03-09*
+
+- **Restored card borders for dark boards** — subtle borders and label-tinted gradient background on dark boards; light boards remain borderless
+- **`isLight` flag on BoardTheme** — enables conditional styling per board type
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
 ## v1.1.1 — Priority Labels
 
 *2026-03-09*

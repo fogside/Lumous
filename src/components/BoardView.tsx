@@ -111,6 +111,7 @@ function startWindowDrag(e: React.MouseEvent) {
 export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, onTitleChange, mode = "full" }: Props) {
   const [editingCard, setEditingCard] = useState<{ card: CardType; columnId: string } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeRect, setActiveRect] = useState<{ width: number; height: number } | null>(null);
   const [dragSourceCol, setDragSourceCol] = useState<string | null>(null);
   const [sparkleEvent, setSparkleEvent] = useState<SparkleEvent | null>(null);
   const [wizardKey, setWizardKey] = useState(0);
@@ -142,6 +143,11 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
     setActiveId(cardId);
     const col = findColumnForCard(cardId);
     setDragSourceCol(col?.id ?? null);
+    const el = (event.active as unknown as { node: { current: HTMLElement | null } }).node?.current;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      setActiveRect({ width: rect.width, height: rect.height });
+    }
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -170,6 +176,7 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setActiveRect(null);
 
     if (!over) return;
 
@@ -333,7 +340,9 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
                 backdropFilter: "blur(12px)",
                 border: `1px solid ${theme.border}`,
                 boxShadow: "0 20px 40px rgba(0,0,0,0.3)",
-                width: 240,
+                width: activeRect?.width,
+                boxSizing: "border-box",
+                overflow: "hidden",
               }}>
                 <p style={{ fontSize: 15, color: theme.text, fontWeight: 500, margin: 0 }}>
                   {activeCard.title}
