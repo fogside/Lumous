@@ -9,11 +9,13 @@ interface Props {
   cards: CardType[];
   onAddCard: (title: string) => void;
   onCardClick: (card: CardType) => void;
+  solo?: boolean;
 }
 
-export function Column({ column, cards, onAddCard, onCardClick }: Props) {
+export function Column({ column, cards, onAddCard, onCardClick, solo }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const isCompleted = column.id === "completed";
+  const shrink = isCompleted && !solo;
 
   return (
     <div
@@ -21,9 +23,10 @@ export function Column({ column, cards, onAddCard, onCardClick }: Props) {
       style={{
         display: "flex",
         flexDirection: "column",
-        flex: "1 1 0",
-        minWidth: 200,
-        opacity: isCompleted ? 0.45 : 1,
+        flex: shrink ? "0.5 1 0" : "1 1 0",
+        minWidth: shrink ? 160 : 200,
+        minHeight: 0,
+        opacity: shrink ? 0.45 : 1,
         transition: "opacity 0.3s",
       }}
     >
@@ -48,9 +51,10 @@ export function Column({ column, cards, onAddCard, onCardClick }: Props) {
           ref={setNodeRef}
           style={{
             flex: 1,
-            borderRadius: 20,
-            padding: 14,
-            minHeight: 140,
+            minHeight: 0,
+            overflowY: "auto",
+            borderRadius: 16,
+            padding: 10,
             transition: "all 0.2s",
             background: isOver ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)",
             outline: isOver ? "1px solid rgba(255,255,255,0.12)" : "none",

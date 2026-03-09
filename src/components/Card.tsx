@@ -25,13 +25,14 @@ export function Card({ card, onClick, faded }: Props) {
       style={{
         transform: CSS.Translate.toString(transform),
         transition,
-        borderRadius: 14,
-        padding: "16px 20px",
-        marginBottom: 10,
+        borderRadius: 12,
+        padding: "10px 14px",
+        marginBottom: 8,
         cursor: "grab",
         background: "rgba(255,255,255,0.08)",
         border: "1px solid rgba(255,255,255,0.08)",
         opacity: isDragging ? 0.4 : faded ? 0.4 : 1,
+        overflow: "hidden",
         userSelect: "none",
       }}
       data-no-drag
@@ -40,7 +41,7 @@ export function Card({ card, onClick, faded }: Props) {
       {...listeners}
       onClick={onClick}
     >
-      <p style={{ fontSize: 15, color: "rgba(255,255,255,0.9)", lineHeight: 1.5, fontWeight: 500, margin: 0 }}>
+      <p style={{ fontSize: 15, color: "rgba(255,255,255,0.9)", lineHeight: 1.5, fontWeight: 500, margin: 0, overflowWrap: "break-word", wordBreak: "break-word" }}>
         {card.title}
       </p>
       {card.description && (

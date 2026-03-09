@@ -51,7 +51,7 @@ function boardReducer(state: Board | null, action: Action): Board | null {
       const card = createCard(action.title);
       const columns = state.columns.map((col) => {
         if (col.id === action.columnId) {
-          return { ...col, cardIds: [...col.cardIds, card.id] };
+          return { ...col, cardIds: [card.id, ...col.cardIds] };
         }
         return col;
       });

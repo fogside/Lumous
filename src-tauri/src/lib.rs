@@ -18,10 +18,13 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
 }
 
 fn get_data_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app
+    let mut dir = app
         .path()
         .app_data_dir()
         .expect("failed to get app data dir");
+    if cfg!(debug_assertions) {
+        dir = dir.with_file_name(format!("{}-dev", dir.file_name().unwrap().to_string_lossy()));
+    }
     let boards_dir = dir.join("boards");
     fs::create_dir_all(&boards_dir).ok();
     dir

@@ -26,9 +26,22 @@ npm run tauri dev
 # Type check
 npx tsc --noEmit
 
-# Production build (generates .dmg)
-npm run tauri build
+# Production build
+TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/WandDo.key)" npm run tauri build
 ```
+
+## Releasing
+1. Bump version in `src-tauri/tauri.conf.json`
+2. Update `RELEASES.md` with changelog
+3. Build with signing: `TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/WandDo.key)" npm run tauri build`
+4. Create `/tmp/latest.json` with new version, signature (from `.sig` file), download URL, and pub_date
+5. Upload to GitHub release:
+   ```bash
+   gh release create vX.Y.Z --title "vX.Y.Z — Title" --notes-file RELEASES.md
+   gh release upload vX.Y.Z src-tauri/target/release/bundle/macos/Lumous.app.tar.gz /tmp/latest.json --clobber
+   ```
+6. No DMG — unsigned app triggers macOS Gatekeeper. Users install via `curl | tar` (see README)
+7. Auto-updater reads `latest.json` from the latest GitHub release endpoint
 
 ## Project Structure
 ```
@@ -100,34 +113,21 @@ All components use **inline styles**, not Tailwind utility classes. This was a d
 - Auto-sync via `setInterval`, manual sync button in sidebar
 - PAT token embedded in repo URL (single-user app)
 
+## Style Guide
+- **Dark UI** with warm accent colors, wizard/magical theme
+- **Inline styles only** — no Tailwind classes (they get stripped)
+- **System font**: `-apple-system` stack
+- **Generous spacing**, subtle shadows, smooth transitions
+- **Completed cards**: faded opacity + completion date shown
+- **Sidebar**: collapsible (72px dots mode vs 270px expanded)
+- **New cards**: prepend to top of column, not bottom
+- **Celebrations**: gold sparkles on cross-column drag, wizard animation on completion
+- **Glows**: use `filter: drop-shadow(...)` (follows alpha contour), never `box-shadow`
+- **Image assets**: `public/wizard-gold.png` (celebration), `public/wizard-watermark.png` (sidebar), `src-tauri/icons/` (app icon from `mage.png`/`mage_small.png`)
+- **Icons**: generated via Pillow script from `mage.png` (>89px) and `mage_small.png` (≤89px), 18% corner radius
+
 ## Common Issues
 - **Port 1420 in use**: `lsof -ti :1420 | xargs kill -9`
 - **Cargo not found**: `export PATH="$HOME/.cargo/bin:$PATH"`
-- **Icon not updating in dev**: Icons only appear in production builds (`.dmg`)
+- **Icon not updating in dev**: Icons only appear in production builds
 - **Window not dragging**: Check `core:window:allow-start-dragging` in capabilities
-
-## Visual Effects & Animations
-
-### Sparkle Effect (`SparkleEffect.tsx`)
-Gold 4-pointed star particles burst when dragging cards between columns. Triggered in `BoardView.handleDragEnd` when source and destination columns differ.
-
-### Wizard Celebration (`WizardCelebration.tsx`)
-Golden wizard appears when a task is moved to the Completed column. Randomly picks one of 4 entry positions (bottom, top, left, right) — never the same twice in a row. Sparkles stream from the wand tip diagonally across the board.
-
-### Adding a New Celebration Image
-1. **Create transparent PNG**: Place the image in `public/`. Use Python Pillow to extract the subject from a source image with background removal (see `wizard-gold.png` as example — extracted from the app icon by detecting olive-green background pixels via R/G ratio and making them transparent).
-2. **Use `drop-shadow` for glow** — never `box-shadow` or radial-gradient divs, as those render as rectangles. `filter: drop-shadow(...)` follows the image's alpha contour.
-3. **Rotation + flip for side entries**: The image enters head-first from each edge:
-   - Bottom: no transform needed
-   - Top: `rotate(180deg)` (upside down)
-   - Right: `rotate(-90deg) scaleX(-1)` — head points left, wand flipped to correct side
-   - Left: `rotate(90deg) scaleX(-1)` — head points right, wand flipped to correct side
-4. **Sparkle anchors**: Position `wandAnchor` CSS to match where the wand tip lands after rotation. Use `top: calc(50% ± offset)` relative to the container. Test each variant visually.
-5. **Image source files**: `public/wizard-gold.png` (celebration), `public/wizard-watermark.png` (sidebar watermark), `src-tauri/icons/` (app icon).
-
-## Design Philosophy
-- Minimalist, dark UI with warm accent colors
-- Whimsical, magical vibe — wizard-themed
-- Generous spacing, system font stack (`-apple-system`)
-- Completed cards: faded opacity + completion date
-- Sidebar: collapsible (72px dots vs 270px full)

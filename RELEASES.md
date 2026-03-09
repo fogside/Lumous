@@ -1,5 +1,23 @@
 # Releases
 
+## v1.1.0 — UI Polish
+
+*2026-03-09*
+
+- **Tighter layout** — reduced paddings across board, columns, and cards so content gets more space
+- **Completed column** — narrower in full board view, full-size in tabbed mode
+- **New cards on top** — new tasks appear at the top of the column
+- **Scrollable columns** — cards scroll within columns instead of overflowing
+- **Text wrapping** — long card titles wrap correctly instead of overflowing the card
+- **Window drag fix** — scrolling inside columns no longer moves the app window
+- **Dev isolation** — dev builds use a separate data directory to avoid conflicts with production
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
 ## v1.0.0 — First Light
 
 *2026-03-09*

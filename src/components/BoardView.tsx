@@ -104,7 +104,7 @@ function startWindowDrag(e: React.MouseEvent) {
   const target = e.target as HTMLElement;
   const tag = target.tagName.toLowerCase();
   if (tag === "input" || tag === "textarea" || tag === "button" || tag === "a" || tag === "select") return;
-  if (target.closest("button") || target.closest("input") || target.closest("textarea") || target.closest("[data-no-drag]") || target.closest("[data-card]")) return;
+  if (target.closest("button") || target.closest("input") || target.closest("textarea") || target.closest("[data-no-drag]") || target.closest("[data-card]") || target.closest("[data-column-id]")) return;
   getCurrentWindow().startDragging();
 }
 
@@ -208,7 +208,7 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
     : board.columns;
 
   const headerPad = isMedium ? "32px 20px 12px 20px" : "44px 48px 28px 48px";
-  const bodyPad = isMedium ? "0 12px 20px 12px" : "0 40px 40px 40px";
+  const bodyPad = isMedium ? "0 12px 20px 12px" : "0 20px 20px 20px";
 
   return (
     <div
@@ -295,7 +295,7 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          <div style={{ display: "flex", gap: 20, height: "100%" }}>
+          <div style={{ display: "flex", gap: 12, height: "100%" }}>
             {visibleColumns.map((column) => {
               const cards = column.cardIds
                 .map((id) => board.cards[id])
@@ -305,6 +305,7 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
                   key={column.id}
                   column={column}
                   cards={cards}
+                  solo={isMedium}
                   onAddCard={(title) => addCard(column.id, title)}
                   onCardClick={(card) => setEditingCard({ card, columnId: column.id })}
                 />
