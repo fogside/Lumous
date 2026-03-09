@@ -1,4 +1,4 @@
-# Lumm — Development Guide
+# Lumous — Development Guide
 
 ## What is this?
 A native macOS todo board app built with Tauri v2 + React + TypeScript. Trello-like boards with drag-and-drop cards, multiple boards, and GitHub sync. The app should feel magical, whimsical, and joyful to use.

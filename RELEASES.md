@@ -4,7 +4,7 @@
 
 *2026-03-09*
 
-The first release of Lumm — a native macOS todo board app.
+The first release of Lumous — a native macOS todo board app.
 
 ### What's included
 
@@ -22,7 +22,7 @@ The first release of Lumm — a native macOS todo board app.
 
 ### Install
 
-Download `Lumm_1.0.0_aarch64.dmg` from the [GitHub release](https://github.com/fogside/Lumm/releases/tag/v1.0.0), open it, and drag Lumm to Applications.
+Download `Lumous_1.0.0_aarch64.dmg` from the [GitHub release](https://github.com/fogside/Lumous/releases/tag/v1.0.0), open it, and drag Lumous to Applications.
 
 ### Platform
 

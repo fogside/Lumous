@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128.png" width="128" height="128" alt="Lumm icon" />
+  <img src="src-tauri/icons/128x128.png" width="128" height="128" alt="Lumous icon" />
 </p>
 
-<h1 align="center">Lumm</h1>
+<h1 align="center">Lumous</h1>
 
 <p align="center">
-  <em>lumm (Estonian) — magic, spell, enchantment</em>
+  <em>lumous (Finnish) — magic, enchantment, spell</em>
 </p>
 
 <p align="center">
@@ -16,7 +16,7 @@
 
 ---
 
-Lumm is a native macOS desktop app for managing tasks across Kanban boards. Fast, offline-first, and optionally syncs to GitHub.
+Lumous is a native macOS desktop app for managing tasks across Kanban boards. Fast, offline-first, and optionally syncs to GitHub.
 
 ### Features
 
@@ -34,7 +34,7 @@ Lumm is a native macOS desktop app for managing tasks across Kanban boards. Fast
 
 ### Install
 
-Download the latest `.dmg` from [Releases](https://github.com/fogside/Lumm/releases), open it, and drag **Lumm** to your Applications folder. No dependencies required — everything is bundled.
+Download the latest `.dmg` from [Releases](https://github.com/fogside/Lumous/releases), open it, and drag **Lumous** to your Applications folder. No dependencies required — everything is bundled.
 
 > **Note:** On first launch, macOS may show a security warning. Go to **System Settings → Privacy & Security** and click "Open Anyway".
 
