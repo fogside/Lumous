@@ -38,7 +38,7 @@ Lumous is a native macOS desktop app for managing tasks across Kanban boards. Fa
 curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
 ```
 
-That's it. No dependencies, no Homebrew, no account. Data is stored locally in `~/Library/Application Support/com.zenja.todo/`. The app updates itself — click the version number in the sidebar to check.
+That's it. No dependencies, no Homebrew, no account. Data is stored locally in `~/Library/Application Support/io.github.fogside.lumous/`. The app updates itself — click the version number in the sidebar to check.
 
 > **Why not a `.dmg`?** macOS quarantines files downloaded through browsers, which causes unsigned apps to be flagged as "damaged". Installing via `curl` skips Gatekeeper entirely.
 

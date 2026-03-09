@@ -3,6 +3,20 @@ use std::path::PathBuf;
 use std::process::Command;
 use tauri::Manager;
 
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let dest = dst.join(entry.file_name());
+        if entry.path().is_dir() {
+            copy_dir_recursive(&entry.path(), &dest)?;
+        } else {
+            fs::copy(entry.path(), &dest)?;
+        }
+    }
+    Ok(())
+}
+
 fn get_data_path(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
         .path()
@@ -105,6 +119,27 @@ pub fn run() {
                         .level(log::LevelFilter::Info)
                         .build(),
                 )?;
+            }
+            // Migrate data from old identifier (com.zenja.todo) if it exists
+            let new_dir = app.handle().path().app_data_dir().expect("app data dir");
+            if !new_dir.join("meta.json").exists() {
+                if let Some(parent) = new_dir.parent() {
+                    let old_dir = parent.join("com.zenja.todo");
+                    if old_dir.join("meta.json").exists() {
+                        fs::create_dir_all(&new_dir).ok();
+                        // Copy all files from old dir to new dir
+                        if let Ok(entries) = fs::read_dir(&old_dir) {
+                            for entry in entries.flatten() {
+                                let dest = new_dir.join(entry.file_name());
+                                if entry.path().is_dir() {
+                                    let _ = copy_dir_recursive(&entry.path(), &dest);
+                                } else {
+                                    let _ = fs::copy(entry.path(), &dest);
+                                }
+                            }
+                        }
+                    }
+                }
             }
             // Ensure data directory exists on startup
             get_data_path(app.handle());

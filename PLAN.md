@@ -8,7 +8,7 @@ Build a native macOS desktop todo app with a Trello-like board UI. Must be fast,
 - **React + TypeScript** — UI layer
 - **@dnd-kit** — drag-and-drop between columns
 - **Tailwind CSS** — styling
-- **Local JSON files** — one per board, stored in `~/Library/Application Support/com.zenja.todo/`
+- **Local JSON files** — one per board, stored in `~/Library/Application Support/io.github.fogside.lumous/`
 - **Git CLI** — GitHub sync via shell commands from Tauri
 
 ## Data Model

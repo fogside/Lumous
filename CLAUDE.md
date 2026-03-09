@@ -8,7 +8,7 @@ A native macOS todo board app built with Tauri v2 + React + TypeScript. Trello-l
 - **React 19 + TypeScript** — UI layer, inline styles (not Tailwind classes)
 - **@dnd-kit** — drag-and-drop cards between columns
 - **Vite** — build tool
-- **Local JSON** — one file per board in `~/Library/Application Support/com.zenja.todo/`
+- **Local JSON** — one file per board in `~/Library/Application Support/io.github.fogside.lumous/`
 - **Git CLI** — GitHub sync via Tauri shell commands
 
 ## Prerequisites

@@ -15,7 +15,7 @@ The first release of Lumous — a native macOS todo board app.
 - **Responsive layout** — adapts from full board (>800px) to tabbed mode (450-800px) to compact Today checklist (<450px)
 - **Celebrations** — golden sparkle burst on cross-column drag, wizard animation on task completion
 - **Auto-update** — checks for new versions on launch, one-click download and restart
-- **Offline-first** — all data stored locally in `~/Library/Application Support/com.zenja.todo/`, no account required
+- **Offline-first** — all data stored locally in `~/Library/Application Support/io.github.fogside.lumous/`, no account required
 - **GitHub sync** — optional push/pull to a GitHub repo for backup or sharing
 - **Frameless dark UI** — custom window chrome, system font stack, warm accent colors
 - **Tiny footprint** — ~5MB native binary, instant launch
