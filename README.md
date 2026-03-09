@@ -34,7 +34,7 @@ Lumm is a native macOS desktop app for managing tasks across Kanban boards. Fast
 
 ### Install
 
-Download the latest `.dmg` from [Releases](https://github.com/fogside/WandDo/releases), open it, and drag **Lumm** to your Applications folder. No dependencies required — everything is bundled.
+Download the latest `.dmg` from [Releases](https://github.com/fogside/Lumm/releases), open it, and drag **Lumm** to your Applications folder. No dependencies required — everything is bundled.
 
 > **Note:** On first launch, macOS may show a security warning. Go to **System Settings → Privacy & Security** and click "Open Anyway".
 

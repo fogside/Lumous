@@ -22,7 +22,7 @@ The first release of Lumm — a native macOS todo board app.
 
 ### Install
 
-Download `Lumm_1.0.0_aarch64.dmg` from the [GitHub release](https://github.com/fogside/WandDo/releases/tag/v1.0.0), open it, and drag Lumm to Applications.
+Download `Lumm_1.0.0_aarch64.dmg` from the [GitHub release](https://github.com/fogside/Lumm/releases/tag/v1.0.0), open it, and drag Lumm to Applications.
 
 ### Platform
 

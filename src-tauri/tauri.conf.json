@@ -43,7 +43,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg4QjBDRUM3RUEzOUJCODYKUldTR3V6bnF4ODZ3aUFBTVBuTjhiekJTUHRFaDJmemFtbHZURlpLTDZ6bGh1NXIrbzJZYUNhMm8K",
       "endpoints": [
-        "https://github.com/fogside/WandDo/releases/latest/download/latest.json"
+        "https://github.com/fogside/Lumm/releases/latest/download/latest.json"
       ]
     }
   }
