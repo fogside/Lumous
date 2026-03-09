@@ -35,7 +35,7 @@ export function SyncSettingsModal({ settings, onSave, onClose }: Props) {
     >
       <div
         style={{
-          background: "#1a1a2e",
+          background: "#0c0c14",
           border: "1px solid rgba(255,255,255,0.1)",
           borderRadius: 24,
           width: 520,

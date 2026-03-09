@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Card } from "../lib/types";
+import { Card, CardLabel, CARD_LABELS } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 interface Props {
@@ -13,8 +13,9 @@ interface Props {
 export function CardModal({ card, columnId, onSave, onDelete, onClose }: Props) {
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description);
+  const [label, setLabel] = useState<CardLabel | undefined>(card.label);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const titleRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     titleRef.current?.focus();
@@ -31,7 +32,7 @@ export function CardModal({ card, columnId, onSave, onDelete, onClose }: Props) 
 
   const handleSave = () => {
     if (!title.trim()) return;
-    onSave({ ...card, title: title.trim(), description: description.trim() });
+    onSave({ ...card, title: title.trim(), description: description.trim(), label: label || undefined });
     onClose();
   };
 
@@ -41,16 +42,17 @@ export function CardModal({ card, columnId, onSave, onDelete, onClose }: Props) 
       onClick={onClose}
     >
       <div
-        className="bg-[#1a1a2e] border border-white/10 rounded-3xl w-[500px] max-w-[90vw] shadow-2xl"
+        className="bg-[#0c0c14] border border-white/10 rounded-3xl w-[500px] max-w-[90vw] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
-        style={{ padding: "40px 44px" }}
+        style={{ padding: "28px 32px" }}
       >
-        <input
+        <textarea
           ref={titleRef}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } }}
           placeholder="Card title..."
+          rows={Math.max(1, Math.ceil(title.length / 30))}
           style={{
             width: "100%",
             background: "transparent",
@@ -61,7 +63,10 @@ export function CardModal({ card, columnId, onSave, onDelete, onClose }: Props) 
             color: "rgba(255,255,255,0.95)",
             outline: "none",
             paddingBottom: 14,
-            marginBottom: 28,
+            marginBottom: 20,
+            resize: "none",
+            lineHeight: 1.4,
+            overflow: "hidden",
           }}
         />
 
@@ -87,7 +92,38 @@ export function CardModal({ card, columnId, onSave, onDelete, onClose }: Props) 
           }}
         />
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 36 }}>
+        <div style={{ marginTop: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>
+            Label
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {CARD_LABELS.map((l) => (
+              <button
+                key={l.name}
+                onClick={() => setLabel(l.value)}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  border: (label || null) === l.value ? "2px solid rgba(255,255,255,0.6)" : "1px solid rgba(255,255,255,0.1)",
+                  background: l.value ? l.color : "rgba(255,255,255,0.06)",
+                  cursor: "pointer",
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.4)",
+                }}
+                title={l.name}
+              >
+                {!l.value && "×"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24 }}>
           <button
             onClick={() => setShowDeleteConfirm(true)}
             style={{

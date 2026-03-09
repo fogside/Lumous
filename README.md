@@ -44,7 +44,7 @@ That's it. No dependencies, no Homebrew, no account. Data is stored locally in `
 
 ### Stack
 
-Tauri v2 (Rust) · React · TypeScript · @dnd-kit
+Tauri v2 (Rust) · React · TypeScript · [dnd-kit](https://github.com/clauderic/dnd-kit)
 
 ### Development
 

@@ -1,9 +1,23 @@
+export type CardLabel = "ember" | "honey" | "sage" | "slate" | "plum" | "rose" | "copper" | null;
+
+export const CARD_LABELS: { value: CardLabel; color: string; name: string }[] = [
+  { value: null, color: "transparent", name: "None" },
+  { value: "ember", color: "#e8836a", name: "Ember" },
+  { value: "copper", color: "#dba06a", name: "Copper" },
+  { value: "honey", color: "#e0c55a", name: "Honey" },
+  { value: "sage", color: "#7cc48a", name: "Sage" },
+  { value: "slate", color: "#7ab4cc", name: "Slate" },
+  { value: "plum", color: "#b48ac0", name: "Plum" },
+  { value: "rose", color: "#d88a9a", name: "Rose" },
+];
+
 export interface Card {
   id: string;
   title: string;
   description: string;
   createdAt: string;
   completedAt: string | null;
+  label?: CardLabel;
 }
 
 export interface Column {

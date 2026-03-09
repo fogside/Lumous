@@ -11,7 +11,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { Board, Card as CardType } from "../lib/types";
+import { Board, Card as CardType, CardLabel } from "../lib/types";
 import { Column } from "./Column";
 import { CardModal } from "./CardModal";
 import { SparkleEffect, SparkleEvent } from "./SparkleEffect";
@@ -116,6 +116,11 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
   const [wizardKey, setWizardKey] = useState(0);
   const [showWizard, setShowWizard] = useState(false);
   const [selectedTab, setSelectedTab] = useState("today");
+
+  const handleLabelChange = useCallback((cardId: string, label: CardLabel) => {
+    const card = board.cards[cardId];
+    if (card) updateCard({ ...card, label });
+  }, [board.cards, updateCard]);
 
   const isMedium = mode === "medium";
 
@@ -308,6 +313,7 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
                   solo={isMedium}
                   onAddCard={(title) => addCard(column.id, title)}
                   onCardClick={(card) => setEditingCard({ card, columnId: column.id })}
+                  onLabelChange={handleLabelChange}
                 />
               );
             })}

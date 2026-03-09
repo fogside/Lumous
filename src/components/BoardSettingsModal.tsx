@@ -23,7 +23,7 @@ export function BoardSettingsModal({ title: initialTitle, backgroundColor, onSav
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-[#1a1a2e] border border-white/10 rounded-3xl w-[560px] max-w-[90vw] shadow-2xl"
+        className="bg-[#0c0c14] border border-white/10 rounded-3xl w-[560px] max-w-[90vw] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         style={{ padding: "40px 44px" }}
       >

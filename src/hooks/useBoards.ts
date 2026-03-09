@@ -40,7 +40,7 @@ export function useBoards() {
         if (m.boardOrder.length > 0 && loaded[m.boardOrder[0]]) {
           setActiveBoardId(m.boardOrder[0]);
         } else if (m.boardOrder.length === 0) {
-          const board = createBoard("My Board");
+          const board = createBoard("My Board", "#556B2F");
           loaded[board.id] = board;
           const newMeta = { ...m, boardOrder: [board.id] };
           await saveBoard(board);

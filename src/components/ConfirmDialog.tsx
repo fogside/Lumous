@@ -34,7 +34,7 @@ export function ConfirmDialog({ title, message, confirmLabel = "Confirm", danger
     >
       <div
         style={{
-          background: "#1a1a2e",
+          background: "#0c0c14",
           border: "1px solid rgba(255,255,255,0.1)",
           borderRadius: 24,
           width: 420,
