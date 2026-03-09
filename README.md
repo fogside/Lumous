@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128.png" width="128" height="128" alt="WandDo icon" />
+  <img src="src-tauri/icons/128x128.png" width="128" height="128" alt="Lumm icon" />
 </p>
 
-<h1 align="center">WandDo</h1>
+<h1 align="center">Lumm</h1>
 
 <p align="center">
-  <em>A todo list for magicians who make things happen.</em>
+  <em>A tiny todo board that gets out of your way.</em>
 </p>
 
 <p align="center">
@@ -16,9 +16,7 @@
 
 ---
 
-Wave your wand. Organize your quests. Ship your spells.
-
-WandDo is a native macOS desktop app for managing tasks across beautiful Kanban boards. Fast, offline-first, and syncs to GitHub when you're ready to share your magic with the world.
+Lumm is a native macOS desktop app for managing tasks across Kanban boards. Fast, offline-first, and optionally syncs to GitHub.
 
 ### Features
 
@@ -28,14 +26,15 @@ WandDo is a native macOS desktop app for managing tasks across beautiful Kanban 
 - **Shadow Board** — per-board analytics dashboard with completion/creation heatmaps, daily plots, streaks, and interactive hover tooltips
 - **Responsive layout** — full board (>800px), tabbed medium mode (450-800px), compact Today checklist (<450px)
 - **Celebrations** — golden sparkles on drag, wizard celebration when completing tasks
+- **Auto-update** — checks for new versions on launch, one-click update from within the app
 - **Offline-first** — works without internet, always
-- **GitHub sync** — push your boards to a repo with one click
+- **GitHub sync** — optional push/pull to a repo with one click
 - **Tiny footprint** — ~5MB native binary, instant launch
 - **Frameless beauty** — custom dark UI, no system chrome
 
 ### Install
 
-Download the latest `.dmg` from [Releases](https://github.com/fogside/WandDo/releases), open it, and drag **WandDo** to your Applications folder. No dependencies required — everything is bundled.
+Download the latest `.dmg` from [Releases](https://github.com/fogside/WandDo/releases), open it, and drag **Lumm** to your Applications folder. No dependencies required — everything is bundled.
 
 > **Note:** On first launch, macOS may show a security warning. Go to **System Settings → Privacy & Security** and click "Open Anyway".
 

@@ -10,9 +10,10 @@ export function UpdateChecker() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
 
-  // Check on mount (silent)
+  // Silent check on mount
   useEffect(() => {
-    checkForUpdate(true);
+    const timer = setTimeout(() => checkForUpdate(true), 2000);
+    return () => clearTimeout(timer);
   }, []);
 
   const checkForUpdate = useCallback(async (silent = false) => {
@@ -25,25 +26,25 @@ export function UpdateChecker() {
         setVersion(update.version);
         setState("available");
       } else {
-        setState(silent ? "idle" : "up-to-date");
-        if (!silent) setTimeout(() => setState("idle"), 3000);
+        if (!silent) {
+          setState("up-to-date");
+          setTimeout(() => setState("idle"), 3000);
+        } else {
+          setState("idle");
+        }
       }
-    } catch (err) {
-      if (!silent) {
-        setError(String(err));
-        setState("error");
-        setTimeout(() => setState("idle"), 5000);
-      } else {
-        setState("idle");
-      }
+    } catch {
+      // Silently fail — network issues, private repo, etc.
+      setState("idle");
     }
   }, []);
 
   const downloadAndInstall = useCallback(async () => {
     setState("downloading");
+    setProgress(0);
     try {
       const update = await check();
-      if (!update) return;
+      if (!update) { setState("idle"); return; }
 
       let totalBytes = 0;
       let downloadedBytes = 0;
@@ -56,8 +57,6 @@ export function UpdateChecker() {
           if (totalBytes > 0) {
             setProgress(Math.round((downloadedBytes / totalBytes) * 100));
           }
-        } else if (event.event === "Finished") {
-          setState("ready");
         }
       });
 
@@ -65,6 +64,7 @@ export function UpdateChecker() {
     } catch (err) {
       setError(String(err));
       setState("error");
+      setTimeout(() => setState("idle"), 5000);
     }
   }, []);
 
@@ -72,30 +72,31 @@ export function UpdateChecker() {
     await relaunch();
   }, []);
 
-  // Nothing to show in idle state
+  const versionButton = (
+    <button
+      onClick={() => checkForUpdate(false)}
+      title="Check for updates"
+      style={{
+        background: "transparent",
+        border: "none",
+        color: "rgba(255,255,255,0.2)",
+        fontSize: 11,
+        cursor: "pointer",
+        padding: "4px 0",
+        fontWeight: 500,
+      }}
+    >
+      v{__APP_VERSION__}
+    </button>
+  );
+
   if (state === "idle") {
-    return (
-      <button
-        onClick={() => checkForUpdate(false)}
-        title="Check for updates"
-        style={{
-          background: "transparent",
-          border: "none",
-          color: "rgba(255,255,255,0.2)",
-          fontSize: 11,
-          cursor: "pointer",
-          padding: "4px 8px",
-          fontWeight: 500,
-        }}
-      >
-        v{__APP_VERSION__}
-      </button>
-    );
+    return versionButton;
   }
 
   if (state === "checking") {
     return (
-      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", padding: "4px 8px", fontWeight: 500 }}>
+      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", padding: "4px 0", fontWeight: 500 }}>
         Checking for updates...
       </div>
     );
@@ -103,8 +104,8 @@ export function UpdateChecker() {
 
   if (state === "up-to-date") {
     return (
-      <div style={{ fontSize: 11, color: "rgba(134,239,172,0.6)", padding: "4px 8px", fontWeight: 500 }}>
-        Up to date
+      <div style={{ fontSize: 11, color: "rgba(134,239,172,0.6)", padding: "4px 0", fontWeight: 500 }}>
+        v{__APP_VERSION__} — up to date
       </div>
     );
   }
@@ -133,9 +134,9 @@ export function UpdateChecker() {
 
   if (state === "downloading") {
     return (
-      <div style={{ padding: "4px 8px" }}>
+      <div style={{ padding: "4px 0" }}>
         <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontWeight: 500, marginBottom: 6 }}>
-          Downloading... {progress > 0 ? `${progress}%` : ""}
+          Downloading{progress > 0 ? ` ${progress}%` : "..."}
         </div>
         <div style={{
           height: 3,
@@ -179,8 +180,8 @@ export function UpdateChecker() {
 
   if (state === "error") {
     return (
-      <div style={{ fontSize: 11, color: "rgba(248,113,113,0.6)", padding: "4px 8px", fontWeight: 500 }} title={error}>
-        Update failed
+      <div style={{ fontSize: 11, color: "rgba(248,113,113,0.5)", padding: "4px 0", fontWeight: 500 }} title={error}>
+        Update failed — try again later
       </div>
     );
   }

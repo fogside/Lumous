@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "WandDo",
+  "productName": "Lumm",
   "version": "1.0.0",
   "identifier": "com.zenja.todo",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "WandDo",
+        "title": "Lumm",
         "width": 1200,
         "height": 800,
         "minWidth": 280,
