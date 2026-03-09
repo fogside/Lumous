@@ -43,6 +43,7 @@ export default function App() {
   const [showSyncSettings, setShowSyncSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [shadowBoardId, setShadowBoardId] = useState<string | null>(null);
+  const [showWisps, setShowWisps] = useState(true);
 
   if (loading) {
     return (
@@ -87,6 +88,7 @@ export default function App() {
           hideToggle={isMedium}
           shadowBoardId={shadowBoardId}
           onToggleShadowBoard={setShadowBoardId}
+          showWisps={showWisps}
         />
       )}
 
@@ -117,6 +119,8 @@ export default function App() {
                 }
               }}
               mode={mode}
+              showWisps={showWisps}
+              onToggleWisps={() => setShowWisps(!showWisps)}
             />
           )
         ) : (
