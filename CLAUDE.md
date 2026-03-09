@@ -102,10 +102,13 @@ All components use **inline styles**, not Tailwind utility classes. This was a d
 - Auto-save on state changes, debounced 500ms
 - First launch auto-creates "My Board"
 
-### Board Colors
-- Two palette groups: Autumn (warm) and Neutral (cool)
-- 10 colors each, defined in `types.ts` as `COLOR_GROUPS`
-- Board background color applied to main content area with transition
+### Board Colors & Themes
+- Two palette groups: Autumn (10 dark/rich) and Neutral (10 pastels + cool)
+- Colors defined as `BoardColor` objects (`hex` + `name`) in `COLOR_GROUPS`
+- **Light boards**: pastels (Peach, Organza, Heavenly White, Rob Roy, Old Brass, Pilk, Locust) auto-switch to dark text via `isLightBoard()` + `getBoardTheme()`
+- **`DARK_INK`** (`#0a0e1a`): single constant for sidebar bg, modal bg, light-board text base — change once, updates everywhere
+- **`BoardTheme`**: semantic color tokens (text, textSecondary, border, surface, etc.) returned by `getBoardTheme()`, threaded through all board-facing components
+- Default first board color: Olive `#556B2F`
 
 ### GitHub Sync
 - Git operations via `std::process::Command` in Rust
@@ -121,7 +124,10 @@ All components use **inline styles**, not Tailwind utility classes. This was a d
 - **Completed cards**: faded opacity + completion date shown
 - **Sidebar**: collapsible (72px dots mode vs 270px expanded)
 - **New cards**: prepend to top of column, not bottom
-- **Celebrations**: gold sparkles on cross-column drag, wizard animation on completion
+- **Celebrations**: sparkles on cross-column drag + wizard on completion, both colored per board theme (gold/ember/sage)
+- **Sparkle colors**: `SparkleEffect` uses `getWizardTheme()` from `WizardCelebration.tsx` to match wizard palette
+- **Cards**: borderless with clipped label glow (glow wrapped in `overflow: hidden` container)
+- **Label picker**: vertical portal in full view, inline horizontal in medium/solo view (`solo` prop)
 - **Glows**: use `filter: drop-shadow(...)` (follows alpha contour), never `box-shadow`
 - **Image assets**: `public/wizard-gold.png` (celebration), `public/wizard-watermark.png` (sidebar), `src-tauri/icons/` (app icon from `mage.png`/`mage_small.png`)
 - **Icons**: generated via Pillow script from `mage.png` (>89px) and `mage_small.png` (≤89px), 18% corner radius
