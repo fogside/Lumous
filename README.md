@@ -5,7 +5,7 @@
 <h1 align="center">Lumous</h1>
 
 <p align="center">
-  <em>lumous (Finnish) — magic, enchantment, spell</em>
+  <em>A todo board for magicians who make things happen.</em>
 </p>
 
 <p align="center">
@@ -63,5 +63,5 @@ npm run tauri build
 ---
 
 <p align="center">
-  <sub>Built with focus and a little bit of magic.</sub>
+  <sub><strong>lumous</strong> (Finnish) — magic, enchantment, spell</sub>
 </p>
