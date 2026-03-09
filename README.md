@@ -5,7 +5,7 @@
 <h1 align="center">Lumm</h1>
 
 <p align="center">
-  <em>A tiny todo board that gets out of your way.</em>
+  <em>lumm (Estonian) — magic, spell, enchantment</em>
 </p>
 
 <p align="center">
