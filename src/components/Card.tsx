@@ -23,7 +23,7 @@ export function Card({ card, onClick, faded }: Props) {
     <div
       ref={setNodeRef}
       style={{
-        transform: CSS.Transform.toString(transform),
+        transform: CSS.Translate.toString(transform),
         transition,
         borderRadius: 14,
         padding: "16px 20px",

@@ -11,6 +11,8 @@
     "core:window:allow-set-position",
     "shell:allow-execute",
     "shell:allow-stdin-write",
-    "shell:default"
+    "shell:default",
+    "updater:default",
+    "process:default"
   ]
 }

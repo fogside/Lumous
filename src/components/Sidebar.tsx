@@ -4,6 +4,7 @@ import { Board, Meta } from "../lib/types";
 import { SyncStatus } from "./SyncStatus";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CompletionHeatmap } from "./CompletionHeatmap";
+import { UpdateChecker } from "./UpdateChecker";
 
 function startWindowDrag(e: React.MouseEvent) {
   if (e.button !== 0) return;
@@ -380,8 +381,9 @@ export function Sidebar({
         WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 30%)",
       }} />
 
-      {/* Sync footer — only in expanded view */}
-      <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "16px 20px" }}>
+      {/* Footer — sync + updates */}
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <UpdateChecker />
         <SyncStatus
           syncState={syncState}
           syncError={syncError}

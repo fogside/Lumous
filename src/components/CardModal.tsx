@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Card } from "../lib/types";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface Props {
   card: Card;
@@ -12,6 +13,7 @@ interface Props {
 export function CardModal({ card, columnId, onSave, onDelete, onClose }: Props) {
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -87,16 +89,17 @@ export function CardModal({ card, columnId, onSave, onDelete, onClose }: Props) 
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 36 }}>
           <button
-            onClick={() => { onDelete(card.id, columnId); onClose(); }}
+            onClick={() => setShowDeleteConfirm(true)}
             style={{
               padding: "10px 20px",
               fontSize: 13,
-              fontWeight: 500,
-              color: "rgba(248,113,113,0.6)",
-              background: "transparent",
-              border: "1px solid rgba(248,113,113,0.15)",
+              fontWeight: 600,
+              color: "rgba(220,80,80,0.7)",
+              background: "rgba(220,80,80,0.06)",
+              border: "1px solid rgba(220,80,80,0.15)",
               borderRadius: 12,
               cursor: "pointer",
+              transition: "all 0.15s",
             }}
           >
             Delete card
@@ -135,6 +138,17 @@ export function CardModal({ card, columnId, onSave, onDelete, onClose }: Props) 
           </div>
         </div>
       </div>
+
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete Card"
+          message={`Are you sure you want to delete "${card.title}"? This action cannot be undone.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { onDelete(card.id, columnId); onClose(); }}
+          onClose={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </div>
   );
 }
