@@ -22,7 +22,9 @@ The first release of Lumous — a native macOS todo board app.
 
 ### Install
 
-Download `Lumous_1.0.0_aarch64.dmg` from the [GitHub release](https://github.com/fogside/Lumous/releases/tag/v1.0.0), open it, and drag Lumous to Applications.
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
 
 ### Platform
 
