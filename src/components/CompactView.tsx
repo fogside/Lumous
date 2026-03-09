@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Board, Card } from "../lib/types";
+import { Board, Card, CardLabel, CARD_LABELS, BoardTheme, getBoardTheme, DARK_INK } from "../lib/types";
 
 interface Props {
   board: Board;
   moveCard: (cardId: string, fromCol: string, toCol: string, toIndex: number) => void;
   addCard: (columnId: string, title: string) => void;
+  updateCard: (card: Card) => void;
 }
 
 function startWindowDrag(e: React.MouseEvent) {
@@ -17,14 +18,60 @@ function startWindowDrag(e: React.MouseEvent) {
   getCurrentWindow().startDragging();
 }
 
+function CompactLabelBar({ current, theme, onChange }: {
+  current: CardLabel | undefined;
+  theme: BoardTheme;
+  onChange: (label: CardLabel) => void;
+}) {
+  return (
+    <div style={{
+      display: "flex",
+      gap: 3,
+      padding: "2px 0 4px 30px",
+    }}>
+      {CARD_LABELS.map((l) => (
+        <button
+          key={l.name}
+          onClick={(e) => { e.stopPropagation(); onChange(l.value); }}
+          style={{
+            width: 14,
+            height: 14,
+            borderRadius: 4,
+            border: (current || null) === l.value ? `2px solid ${theme.text}` : "none",
+            background: l.value ? l.color : theme.surface,
+            cursor: "pointer",
+            padding: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 8,
+            color: theme.textSecondary,
+            opacity: (current || null) === l.value ? 1 : 0.6,
+            transition: "opacity 0.1s",
+          }}
+          title={l.name}
+        >
+          {!l.value && "×"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function CompactCard({
   card,
   onComplete,
+  onLabelChange,
+  theme,
 }: {
   card: Card;
   onComplete: () => void;
+  onLabelChange: (label: CardLabel) => void;
+  theme: BoardTheme;
 }) {
   const [checked, setChecked] = useState(false);
+  const [showLabels, setShowLabels] = useState(false);
+  const labelColor = CARD_LABELS.find((l) => l.value === card.label)?.color;
 
   const handleCheck = () => {
     setChecked(true);
@@ -34,70 +81,97 @@ function CompactCard({
   return (
     <div
       style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 10,
-        padding: "10px 0",
-        borderBottom: "1px solid rgba(255,255,255,0.05)",
+        padding: "6px 0",
+        borderBottom: `1px solid ${theme.borderSubtle}`,
         opacity: checked ? 0.3 : 1,
         transition: "opacity 0.3s",
       }}
     >
-      <button
-        onClick={handleCheck}
+      <div
         style={{
-          width: 20,
-          height: 20,
-          minWidth: 20,
-          borderRadius: 6,
-          border: checked
-            ? "2px solid #CD9B3C"
-            : "2px solid rgba(255,255,255,0.2)",
-          background: checked ? "#CD9B3C" : "transparent",
-          cursor: "pointer",
-          marginTop: 1,
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "all 0.2s",
+          alignItems: "flex-start",
+          gap: 10,
+          padding: "4px 0",
         }}
       >
-        {checked && (
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path
-              d="M2 6L5 9L10 3"
-              stroke="#0c0c14"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+        <button
+          onClick={handleCheck}
+          style={{
+            width: 20,
+            height: 20,
+            minWidth: 20,
+            borderRadius: 6,
+            border: checked
+              ? "2px solid #CD9B3C"
+              : `2px solid ${theme.textTertiary}`,
+            background: checked ? "#CD9B3C" : "transparent",
+            cursor: "pointer",
+            marginTop: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.2s",
+          }}
+        >
+          {checked && (
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path
+                d="M2 6L5 9L10 3"
+                stroke={DARK_INK}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+        </button>
+        <span
+          onClick={() => setShowLabels(!showLabels)}
+          style={{
+            flex: 1,
+            fontSize: 14,
+            color: checked ? theme.textTertiary : theme.text,
+            lineHeight: 1.4,
+            fontWeight: 500,
+            textDecoration: checked ? "line-through" : "none",
+            transition: "all 0.3s",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            cursor: "pointer",
+          }}
+        >
+          {card.title}
+        </span>
+        {card.label && labelColor && (
+          <div style={{
+            width: 8,
+            height: 8,
+            borderRadius: 3,
+            background: labelColor,
+            flexShrink: 0,
+            marginTop: 5,
+          }} />
         )}
-      </button>
-      <span
-        style={{
-          fontSize: 14,
-          color: checked ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.85)",
-          lineHeight: 1.4,
-          fontWeight: 500,
-          textDecoration: checked ? "line-through" : "none",
-          transition: "all 0.3s",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          display: "-webkit-box",
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: "vertical",
-        }}
-      >
-        {card.title}
-      </span>
+      </div>
+      {showLabels && (
+        <CompactLabelBar
+          current={card.label}
+          theme={theme}
+          onChange={(label) => { onLabelChange(label); setShowLabels(false); }}
+        />
+      )}
     </div>
   );
 }
 
-export function CompactView({ board, moveCard, addCard }: Props) {
+export function CompactView({ board, moveCard, addCard, updateCard }: Props) {
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const theme = getBoardTheme(board.backgroundColor);
 
   const todayCol = board.columns.find((c) => c.id === "today");
   const todayCards = todayCol
@@ -142,7 +216,7 @@ export function CompactView({ board, moveCard, addCard }: Props) {
             height: 10,
             borderRadius: 4,
             backgroundColor: board.backgroundColor,
-            border: "1px solid rgba(255,255,255,0.2)",
+            border: `1px solid ${theme.textTertiary}`,
             flexShrink: 0,
           }}
         />
@@ -152,7 +226,7 @@ export function CompactView({ board, moveCard, addCard }: Props) {
             fontWeight: 700,
             textTransform: "uppercase",
             letterSpacing: "0.12em",
-            color: "rgba(255,255,255,0.4)",
+            color: theme.textSecondary,
           }}
         >
           Today
@@ -160,7 +234,7 @@ export function CompactView({ board, moveCard, addCard }: Props) {
         <span
           style={{
             fontSize: 11,
-            color: "rgba(255,255,255,0.2)",
+            color: theme.textTertiary,
             fontWeight: 600,
             marginLeft: "auto",
           }}
@@ -184,9 +258,9 @@ export function CompactView({ board, moveCard, addCard }: Props) {
             width: "100%",
             padding: "8px 12px",
             borderRadius: 8,
-            border: "1px solid rgba(255,255,255,0.08)",
-            background: "rgba(255,255,255,0.05)",
-            color: "rgba(255,255,255,0.8)",
+            border: `1px solid ${theme.borderSubtle}`,
+            background: theme.surface,
+            color: theme.text,
             fontSize: 13,
             fontWeight: 500,
             outline: "none",
@@ -207,13 +281,15 @@ export function CompactView({ board, moveCard, addCard }: Props) {
             key={card.id}
             card={card}
             onComplete={() => moveCard(card.id, "today", "completed", 0)}
+            onLabelChange={(label) => updateCard({ ...card, label })}
+            theme={theme}
           />
         ))}
         {todayCards.length === 0 && (
           <div
             style={{
               textAlign: "center",
-              color: "rgba(255,255,255,0.1)",
+              color: theme.textFaint,
               fontSize: 12,
               padding: "32px 0",
               fontWeight: 500,

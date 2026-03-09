@@ -115,15 +115,19 @@ export function useBoard(
     }
 
     if (initialBoard) {
+      lastSetBoardRef.current = initialBoard;
       dispatch({ type: "SET_BOARD", board: initialBoard });
     }
   }, [initialBoard]);
 
+  // Track the last board we set from initialBoard to skip save on external updates
+  const lastSetBoardRef = useRef<Board | null>(initialBoard);
+
   // Auto-save on changes (debounced) + sync back to parent
   useEffect(() => {
     if (!board) return;
-    // Skip saving when board was just set from initialBoard
-    if (board === initialBoard) return;
+    // Skip when board was just set from initialBoard (external update, not user action)
+    if (board === lastSetBoardRef.current) return;
 
     dirtyRef.current = true;
 
@@ -136,7 +140,7 @@ export function useBoard(
       dirtyRef.current = false;
     }, 500);
     return () => clearTimeout(saveTimeout.current);
-  }, [board, initialBoard, onBoardChanged]);
+  }, [board, onBoardChanged]);
 
   const moveCard = useCallback(
     (cardId: string, fromCol: string, toCol: string, toIndex: number) => {

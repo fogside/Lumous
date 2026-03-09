@@ -105,7 +105,12 @@ export function useBoards() {
   );
 
   const refreshBoard = useCallback((board: Board) => {
-    setBoards((prev) => ({ ...prev, [board.id]: board }));
+    setBoards((prev) => {
+      const existing = prev[board.id];
+      if (!existing) return { ...prev, [board.id]: board };
+      // Preserve metadata (title, color) from updateBoardMeta, take card/column data from useBoard
+      return { ...prev, [board.id]: { ...board, title: existing.title, backgroundColor: existing.backgroundColor } };
+    });
   }, []);
 
   const updateSettings = useCallback(

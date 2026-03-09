@@ -11,26 +11,50 @@ interface TrailSparkle {
   burstY: number;
 }
 
-const GOLD_PALETTE = [
-  "#FFD700",
-  "#FFC125",
-  "#EDBA3C",
-  "#F5D78E",
-  "#FFE4A0",
-  "#CD9B3C",
-  "#FFEC8B",
-  "#FFF8DC",
-];
+// Three wizard color themes
+const THEME_GOLD = {
+  palette: ["#FFD700", "#FFC125", "#EDBA3C", "#F5D78E", "#FFE4A0", "#CD9B3C", "#FFEC8B", "#FFF8DC"],
+  glow: "rgba(255,215,0,0.4)",
+  glowSoft: "rgba(255,215,0,0.15)",
+  hueRotate: 0,
+};
+
+const THEME_EMBER = {
+  palette: ["#E8836A", "#DBA06A", "#D4896A", "#EDAC8E", "#E8C0A0", "#C47A5A", "#EDBA8B", "#F5DCC8"],
+  glow: "rgba(232,131,106,0.4)",
+  glowSoft: "rgba(232,131,106,0.15)",
+  hueRotate: -15,
+};
+
+const THEME_COOL = {
+  palette: ["#A5C779", "#96BC6E", "#88B460", "#B8D89A", "#C8E4B0", "#78A850", "#B0D088", "#DCF0C8"],
+  glow: "rgba(165,199,121,0.4)",
+  glowSoft: "rgba(165,199,121,0.15)",
+  hueRotate: 50,
+};
+
+// Orange/yellow autumn boards → green-sage tint; neutral boards → ember; rest → gold
+const WARM_AUTUMN = new Set<string>(); // no warm-yellow autumn colors remain
+const NEUTRAL_BOARDS = new Set([
+  "#A9AE92", "#F5C79F", "#F4E0CB", "#F3F2EC", "#E7C277",
+  "#7B6B8E", "#5E8A87", "#DFABA2", "#5E7085", "#A29969",
+]);
+
+export function getWizardTheme(boardColor: string) {
+  if (WARM_AUTUMN.has(boardColor)) return THEME_COOL;
+  if (NEUTRAL_BOARDS.has(boardColor)) return THEME_EMBER;
+  return THEME_GOLD;
+}
 
 let sparkleCounter = 0;
 
-function createTrailSparkles(count = 30): TrailSparkle[] {
+function createTrailSparkles(palette: string[], count = 30): TrailSparkle[] {
   return Array.from({ length: count }, (_, i) => ({
     id: sparkleCounter++,
     size: 6 + Math.random() * 14,
     duration: 900 + Math.random() * 700,
     delay: i * 35 + Math.random() * 60,
-    color: GOLD_PALETTE[Math.floor(Math.random() * GOLD_PALETTE.length)],
+    color: palette[Math.floor(Math.random() * palette.length)],
     spread: (Math.random() - 0.5) * 140,
     burstX: (Math.random() - 0.5) * 90,
     burstY: (Math.random() - 0.5) * 90,
@@ -76,8 +100,6 @@ function getVariantConfig(variant: Variant): VariantConfig {
         trailAnim: "trail-top",
       };
     case "right":
-      // Entering from right: head should point LEFT into the board
-      // scaleX(-1) first mirrors wand to left side, then rotate(-90deg) puts head left, wand at bottom
       return {
         wizardStyle: { top: "50%", right: 0 },
         imgTransform: "rotate(-90deg) scaleX(-1)",
@@ -86,8 +108,6 @@ function getVariantConfig(variant: Variant): VariantConfig {
         trailAnim: "trail-right",
       };
     case "left":
-      // Entering from left: head should point RIGHT into the board
-      // rotate(90deg) = clockwise = top(head) goes RIGHT
       return {
         wizardStyle: { top: "50%", left: 0 },
         imgTransform: "rotate(90deg) scaleX(-1)",
@@ -98,10 +118,15 @@ function getVariantConfig(variant: Variant): VariantConfig {
   }
 }
 
-export function WizardCelebration({ visible }: { visible: boolean }) {
-  // Pick variant and sparkles once on mount (key change = re-mount = new variant)
+interface Props {
+  visible: boolean;
+  boardColor?: string;
+}
+
+export function WizardCelebration({ visible, boardColor = "#556B2F" }: Props) {
+  const theme = getWizardTheme(boardColor);
   const [variant] = useState<Variant>(pickVariant);
-  const [sparkles] = useState<TrailSparkle[]>(createTrailSparkles);
+  const [sparkles] = useState<TrailSparkle[]>(() => createTrailSparkles(theme.palette));
   const [show, setShow] = useState(false);
   const [sparklesReady, setSparklesReady] = useState(false);
 
@@ -158,8 +183,7 @@ export function WizardCelebration({ visible }: { visible: boolean }) {
             height: "100%",
             objectFit: "contain",
             transform: config.imgTransform,
-            filter:
-              "drop-shadow(0 0 18px rgba(255,215,0,0.4)) drop-shadow(0 0 40px rgba(255,215,0,0.15))",
+            filter: `drop-shadow(0 0 20px ${theme.glow}) drop-shadow(0 0 44px ${theme.glowSoft}) hue-rotate(${theme.hueRotate}deg)`,
           }}
         />
       </div>

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { DARK_INK } from "../lib/types";
 
 interface Props {
   title: string;
@@ -34,7 +35,7 @@ export function ConfirmDialog({ title, message, confirmLabel = "Confirm", danger
     >
       <div
         style={{
-          background: "#0c0c14",
+          background: DARK_INK,
           border: "1px solid rgba(255,255,255,0.1)",
           borderRadius: 24,
           width: 420,

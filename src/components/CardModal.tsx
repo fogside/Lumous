@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Card, CardLabel, CARD_LABELS } from "../lib/types";
+import { Card, CardLabel, CARD_LABELS, DARK_INK } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 interface Props {
@@ -42,9 +42,9 @@ export function CardModal({ card, columnId, onSave, onDelete, onClose }: Props) 
       onClick={onClose}
     >
       <div
-        className="bg-[#0c0c14] border border-white/10 rounded-3xl w-[500px] max-w-[90vw] shadow-2xl"
+        className="border border-white/10 rounded-3xl w-[500px] max-w-[90vw] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
-        style={{ padding: "28px 32px" }}
+        style={{ padding: "28px 32px", background: DARK_INK }}
       >
         <textarea
           ref={titleRef}

@@ -1,6 +1,6 @@
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { Column as ColumnType, Card as CardType, CardLabel } from "../lib/types";
+import { Column as ColumnType, Card as CardType, CardLabel, BoardTheme } from "../lib/types";
 import { Card } from "./Card";
 import { NewCardInput } from "./NewCardInput";
 
@@ -11,9 +11,11 @@ interface Props {
   onCardClick: (card: CardType) => void;
   onLabelChange: (cardId: string, label: CardLabel) => void;
   solo?: boolean;
+  boardColor?: string;
+  theme: BoardTheme;
 }
 
-export function Column({ column, cards, onAddCard, onCardClick, onLabelChange, solo }: Props) {
+export function Column({ column, cards, onAddCard, onCardClick, onLabelChange, solo, boardColor, theme }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const isCompleted = column.id === "completed";
   const shrink = isCompleted && !solo;
@@ -38,10 +40,10 @@ export function Column({ column, cards, onAddCard, onCardClick, onLabelChange, s
         justifyContent: "space-between",
         padding: "8px 8px 12px 8px",
       }}>
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "rgba(255,255,255,0.45)" }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: theme.textSecondary }}>
           {column.title}
         </span>
-        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+        <span style={{ fontSize: 11, color: theme.textTertiary, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
           {cards.length}
         </span>
       </div>
@@ -57,13 +59,13 @@ export function Column({ column, cards, onAddCard, onCardClick, onLabelChange, s
             borderRadius: 16,
             padding: 10,
             transition: "all 0.2s",
-            background: isOver ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)",
-            outline: isOver ? "1px solid rgba(255,255,255,0.12)" : "none",
+            background: isOver ? theme.surfaceHover : theme.surfaceFaint,
+            outline: isOver ? `1px solid ${theme.border}` : "none",
           }}
         >
           {/* Add card at top */}
           <div style={{ marginBottom: 12 }}>
-            <NewCardInput onAdd={onAddCard} />
+            <NewCardInput onAdd={onAddCard} theme={theme} />
           </div>
 
           {/* Cards */}
@@ -75,11 +77,14 @@ export function Column({ column, cards, onAddCard, onCardClick, onLabelChange, s
               onClick={() => onCardClick(card)}
               onLabelChange={onLabelChange}
               faded={isCompleted}
+              boardColor={boardColor}
+              theme={theme}
+              solo={solo}
             />
           ))}
 
           {cards.length === 0 && (
-            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.1)", fontSize: 12, padding: "32px 0", fontWeight: 500 }}>
+            <div style={{ textAlign: "center", color: theme.textFaint, fontSize: 12, padding: "32px 0", fontWeight: 500 }}>
               No tasks yet
             </div>
           )}

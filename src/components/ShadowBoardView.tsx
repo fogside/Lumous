@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Board } from "../lib/types";
+import { Board, getBoardTheme } from "../lib/types";
 
 interface Props {
   board: Board;
@@ -107,10 +107,11 @@ function Tooltip({ x, y, children }: { x: number; y: number; children: React.Rea
 
 // ─── HeatmapGrid (fills available space) ───
 
-function HeatmapGrid({ counts, days, color }: {
+function HeatmapGrid({ counts, days, color, theme }: {
   counts: Record<string, number>;
   days: string[];
   color: string;
+  theme: ReturnType<typeof getBoardTheme>;
 }) {
   const [hover, setHover] = useState<{ day: string; x: number; y: number } | null>(null);
   const max = Math.max(...Object.values(counts), 0);
@@ -157,7 +158,7 @@ function HeatmapGrid({ counts, days, color }: {
           const ml = monthLabels.find((m) => m.weekIndex === wi);
           return (
             <div key={wi} style={{
-              flex: 1, fontSize: 11, color: "rgba(255,255,255,0.25)", fontWeight: 600,
+              flex: 1, fontSize: 11, color: theme.textTertiary, fontWeight: 600,
               whiteSpace: "nowrap", overflow: "visible",
             }}>
               {ml?.label || ""}
@@ -170,7 +171,7 @@ function HeatmapGrid({ counts, days, color }: {
         <div style={{ display: "flex", flexDirection: "column", gap, width: 32, flexShrink: 0 }}>
           {DAY_LABELS.map((l, i) => (
             <div key={i} style={{
-              flex: 1, fontSize: 11, color: "rgba(255,255,255,0.2)",
+              flex: 1, fontSize: 11, color: theme.textTertiary,
               fontWeight: 600, display: "flex", alignItems: "center",
             }}>{l}</div>
           ))}
@@ -193,10 +194,10 @@ function HeatmapGrid({ counts, days, color }: {
                     }}
                     style={{
                       flex: 1, borderRadius: 3,
-                      backgroundColor: count > 0 ? color : "rgba(255,255,255,0.06)",
+                      backgroundColor: count > 0 ? color : theme.surface,
                       opacity: count > 0 ? alpha : 1,
                       cursor: "default",
-                      outline: isHovered ? `2px solid rgba(255,255,255,0.5)` : "none",
+                      outline: isHovered ? `2px solid ${theme.textSecondary}` : "none",
                       outlineOffset: -1,
                       transition: "outline 0.1s",
                     }}
@@ -213,12 +214,13 @@ function HeatmapGrid({ counts, days, color }: {
 
 // ─── DailyPlot (SVG area chart) ───
 
-function DailyPlot({ counts, days, color, label, total }: {
+function DailyPlot({ counts, days, color, label, total, theme }: {
   counts: Record<string, number>;
   days: string[];
   color: string;
   label: string;
   total: number;
+  theme: ReturnType<typeof getBoardTheme>;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
@@ -289,10 +291,10 @@ function DailyPlot({ counts, days, color, label, total }: {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4, flexShrink: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.5)", fontVariantNumeric: "tabular-nums" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: theme.textSecondary, fontVariantNumeric: "tabular-nums" }}>
           {total} total
         </span>
-        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", fontWeight: 500 }}>
+        <span style={{ fontSize: 12, color: theme.textTertiary, fontWeight: 500 }}>
           {avg} avg/active day
         </span>
       </div>
@@ -320,7 +322,7 @@ function DailyPlot({ counts, days, color, label, total }: {
           {[0.25, 0.5, 0.75].map((r) => (
             <line key={r}
               x1={0} y1={padTop + plotH * (1 - r)} x2={w} y2={padTop + plotH * (1 - r)}
-              stroke="rgba(255,255,255,0.05)" strokeWidth="0.5"
+              stroke={theme.borderSubtle} strokeWidth="0.5"
             />
           ))}
           {/* Area fill */}
@@ -332,11 +334,11 @@ function DailyPlot({ counts, days, color, label, total }: {
             <>
               <line
                 x1={hoverCoord.x} y1={padTop} x2={hoverCoord.x} y2={padTop + plotH}
-                stroke="rgba(255,255,255,0.2)" strokeWidth="1" strokeDasharray="3,3"
+                stroke={theme.textTertiary} strokeWidth="1" strokeDasharray="3,3"
               />
               <circle
                 cx={hoverCoord.x} cy={hoverCoord.y} r="5"
-                fill={color} stroke="rgba(255,255,255,0.6)" strokeWidth="2"
+                fill={color} stroke={theme.text} strokeWidth="2"
               />
             </>
           )}
@@ -344,7 +346,7 @@ function DailyPlot({ counts, days, color, label, total }: {
           {monthTicks.map((t, i) => (
             <text key={i} x={0} y={0}
               transform={`translate(${t.x + 4}, ${h - 4}) rotate(-40)`}
-              fill="rgba(255,255,255,0.2)" fontSize="12" fontWeight="600"
+              fill={theme.textTertiary} fontSize="12" fontWeight="600"
               textAnchor="start"
             >{t.label}</text>
           ))}
@@ -380,16 +382,16 @@ function computeStreaks(counts: Record<string, number>, days: string[]) {
   return { bestStreak, streak, activeDays, maxDay };
 }
 
-function Indicators({ items }: { items: { value: string | number; label: string }[] }) {
+function Indicators({ items, theme }: { items: { value: string | number; label: string }[]; theme: ReturnType<typeof getBoardTheme> }) {
   return (
     <div style={{
       display: "flex", gap: 16, marginTop: 10, fontSize: 12,
-      color: "rgba(255,255,255,0.25)", fontWeight: 500, fontVariantNumeric: "tabular-nums",
+      color: theme.textTertiary, fontWeight: 500, fontVariantNumeric: "tabular-nums",
       flexShrink: 0,
     }}>
       {items.map((item, i) => (
         <span key={i}>
-          <span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 700 }}>{item.value}</span>
+          <span style={{ color: theme.textSecondary, fontWeight: 700 }}>{item.value}</span>
           {" "}{item.label}
         </span>
       ))}
@@ -398,6 +400,7 @@ function Indicators({ items }: { items: { value: string | number; label: string 
 }
 
 export function ShadowBoardView({ board, onClose }: Props) {
+  const theme = getBoardTheme(board.backgroundColor);
   const numWeeks = 13;
   const days = getLastNWeeks(numWeeks);
 
@@ -441,27 +444,27 @@ export function ShadowBoardView({ board, onClose }: Props) {
         <button onClick={onClose} data-no-drag style={{
           width: 30, height: 30, borderRadius: 8,
           display: "flex", alignItems: "center", justifyContent: "center",
-          background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)",
-          color: "rgba(255,255,255,0.5)", cursor: "pointer", flexShrink: 0,
+          background: theme.surface, border: `1px solid ${theme.border}`,
+          color: theme.textSecondary, cursor: "pointer", flexShrink: 0,
         }}>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M9 3L5 7L9 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "rgba(255,255,255,0.9)", margin: 0 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: theme.text, margin: 0 }}>
           {board.title}
         </h1>
         <span style={{
-          fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.2)",
+          fontSize: 11, fontWeight: 600, color: theme.textTertiary,
           textTransform: "uppercase", letterSpacing: "0.1em",
         }}>
           Shadow Board
         </span>
         {showDemo && (
           <span style={{
-            marginLeft: "auto", fontSize: 10, color: "rgba(255,255,255,0.2)",
+            marginLeft: "auto", fontSize: 10, color: theme.textTertiary,
             fontWeight: 500, padding: "3px 8px", borderRadius: 5,
-            background: "rgba(255,255,255,0.05)",
+            background: theme.surface,
           }}>
             Sample data
           </span>
@@ -481,7 +484,7 @@ export function ShadowBoardView({ board, onClose }: Props) {
         <div style={{
           padding: "16px 20px",
           borderRadius: 12,
-          background: "rgba(255,255,255,0.04)",
+          background: theme.surfaceFaint,
           display: "flex", flexDirection: "column",
           overflow: "hidden", minHeight: 0,
         }}>
@@ -491,12 +494,12 @@ export function ShadowBoardView({ board, onClose }: Props) {
             <span style={{ fontSize: 14, fontWeight: 700, color: "#CD9B3C", opacity: 0.85 }}>
               Tasks Completed
             </span>
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ fontSize: 12, color: theme.textTertiary, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
               {periodCompletions.length} in {numWeeks}w
             </span>
           </div>
-          <HeatmapGrid counts={completionCounts} days={days} color="#CD9B3C" />
-          <Indicators items={[
+          <HeatmapGrid counts={completionCounts} days={days} color="#CD9B3C" theme={theme} />
+          <Indicators theme={theme} items={[
             { value: compStats.streak, label: "streak" },
             { value: compStats.bestStreak, label: "best" },
             { value: compStats.activeDays, label: "active days" },
@@ -508,7 +511,7 @@ export function ShadowBoardView({ board, onClose }: Props) {
         <div style={{
           padding: "16px 20px",
           borderRadius: 12,
-          background: "rgba(255,255,255,0.04)",
+          background: theme.surfaceFaint,
           display: "flex", flexDirection: "column",
           minWidth: 0, minHeight: 0,
         }}>
@@ -524,6 +527,7 @@ export function ShadowBoardView({ board, onClose }: Props) {
             color="#CD9B3C"
             label="completed"
             total={periodCompletions.length}
+            theme={theme}
           />
         </div>
 
@@ -531,7 +535,7 @@ export function ShadowBoardView({ board, onClose }: Props) {
         <div style={{
           padding: "16px 20px",
           borderRadius: 12,
-          background: "rgba(255,255,255,0.04)",
+          background: theme.surfaceFaint,
           display: "flex", flexDirection: "column",
           overflow: "hidden", minHeight: 0,
         }}>
@@ -541,12 +545,12 @@ export function ShadowBoardView({ board, onClose }: Props) {
             <span style={{ fontSize: 14, fontWeight: 700, color: "#6B8E6B", opacity: 0.85 }}>
               Tasks Created
             </span>
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ fontSize: 12, color: theme.textTertiary, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
               {periodCreations.length} in {numWeeks}w
             </span>
           </div>
-          <HeatmapGrid counts={creationCounts} days={days} color="#6B8E6B" />
-          <Indicators items={[
+          <HeatmapGrid counts={creationCounts} days={days} color="#6B8E6B" theme={theme} />
+          <Indicators theme={theme} items={[
             { value: createStats.activeDays, label: "active days" },
             { value: createStats.maxDay, label: "max/day" },
             { value: periodCreations.length > 0
@@ -559,7 +563,7 @@ export function ShadowBoardView({ board, onClose }: Props) {
         <div style={{
           padding: "16px 20px",
           borderRadius: 12,
-          background: "rgba(255,255,255,0.04)",
+          background: theme.surfaceFaint,
           display: "flex", flexDirection: "column",
           minWidth: 0, minHeight: 0,
         }}>
@@ -575,6 +579,7 @@ export function ShadowBoardView({ board, onClose }: Props) {
             color="#6B8E6B"
             label="created"
             total={periodCreations.length}
+            theme={theme}
           />
         </div>
       </div>

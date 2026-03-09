@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { COLOR_GROUPS, ALL_COLORS } from "../lib/types";
+import { COLOR_GROUPS, getBoardTheme, DARK_INK } from "../lib/types";
 
 interface Props {
   onSave: (title: string, color: string) => void;
@@ -8,7 +8,7 @@ interface Props {
 
 export function NewBoardModal({ onSave, onClose }: Props) {
   const [title, setTitle] = useState("");
-  const [color, setColor] = useState(ALL_COLORS[0]);
+  const [color, setColor] = useState(COLOR_GROUPS[0].colors[0].hex);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -28,9 +28,9 @@ export function NewBoardModal({ onSave, onClose }: Props) {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-[#0c0c14] border border-white/10 rounded-3xl w-[560px] max-w-[90vw] shadow-2xl"
+        className="border border-white/10 rounded-3xl w-[560px] max-w-[90vw] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
-        style={{ padding: "40px 44px" }}
+        style={{ padding: "40px 44px", background: DARK_INK }}
       >
         <h2 style={{ fontSize: 24, fontWeight: 700, color: "rgba(255,255,255,0.95)", marginBottom: 32 }}>
           New Board
@@ -71,7 +71,7 @@ export function NewBoardModal({ onSave, onClose }: Props) {
             transition: "background-color 0.2s",
           }}
         >
-          <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 15, fontWeight: 500 }}>
+          <span style={{ color: getBoardTheme(color).text, opacity: 0.7, fontSize: 15, fontWeight: 500 }}>
             {title.trim() || "Board Preview"}
           </span>
         </div>
@@ -84,18 +84,19 @@ export function NewBoardModal({ onSave, onClose }: Props) {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
               {group.colors.map((c) => (
                 <button
-                  key={c}
-                  onClick={() => setColor(c)}
+                  key={c.hex}
+                  onClick={() => setColor(c.hex)}
+                  title={c.name}
                   style={{
-                    backgroundColor: c,
+                    backgroundColor: c.hex,
                     aspectRatio: "2 / 1",
                     borderRadius: 12,
-                    border: color === c ? "2px solid white" : "2px solid transparent",
-                    outline: color === c ? "2px solid rgba(255,255,255,0.3)" : "none",
+                    border: color === c.hex ? "2px solid white" : "2px solid transparent",
+                    outline: color === c.hex ? "2px solid rgba(255,255,255,0.3)" : "none",
                     outlineOffset: 2,
                     cursor: "pointer",
                     transition: "all 0.15s",
-                    transform: color === c ? "scale(1.05)" : "scale(1)",
+                    transform: color === c.hex ? "scale(1.05)" : "scale(1)",
                   }}
                 />
               ))}

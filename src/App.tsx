@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { DARK_INK } from "./lib/types";
 import { useBoards } from "./hooks/useBoards";
 import { useBoard } from "./hooks/useBoard";
 import { useSync } from "./hooks/useSync";
@@ -45,14 +46,16 @@ export default function App() {
 
   if (loading) {
     return (
-      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0c0c14" }}>
+      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: DARK_INK }}>
         <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 13, fontWeight: 500 }}>Loading...</div>
       </div>
     );
   }
 
-  // Use boards record directly — it's kept in sync via onBoardChanged callback
-  const allBoards = board && activeBoardId ? { ...boards, [activeBoardId]: board } : boards;
+  // Merge: metadata (title, color) from boards record, card/column state from useBoard reducer
+  const allBoards = board && activeBoardId && boards[activeBoardId]
+    ? { ...boards, [activeBoardId]: { ...board, title: boards[activeBoardId].title, backgroundColor: boards[activeBoardId].backgroundColor } }
+    : boards;
 
   const editingBoard = editingBoardId ? allBoards[editingBoardId] : null;
   const isCompact = mode === "compact";
@@ -62,7 +65,7 @@ export default function App() {
   const effectiveCollapsed = isMedium ? true : sidebarCollapsed;
 
   return (
-    <div style={{ height: "100vh", display: "flex", overflow: "hidden", background: "#0c0c14" }}>
+    <div style={{ height: "100vh", display: "flex", overflow: "hidden", background: DARK_INK }}>
       {/* Hide sidebar entirely in compact mode */}
       {!isCompact && (
         <Sidebar
@@ -81,6 +84,7 @@ export default function App() {
           onOpenSyncSettings={() => setShowSyncSettings(true)}
           collapsed={effectiveCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          hideToggle={isMedium}
           shadowBoardId={shadowBoardId}
           onToggleShadowBoard={setShadowBoardId}
         />
@@ -95,13 +99,14 @@ export default function App() {
         ) : board ? (
           isCompact ? (
             <CompactView
-              board={board}
+              board={activeBoardId ? allBoards[activeBoardId] || board : board}
               moveCard={moveCard}
               addCard={addCard}
+              updateCard={updateCard}
             />
           ) : (
             <BoardView
-              board={board}
+              board={activeBoardId ? allBoards[activeBoardId] || board : board}
               moveCard={moveCard}
               addCard={addCard}
               updateCard={updateCard}

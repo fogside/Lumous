@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getWizardTheme } from "./WizardCelebration";
 
 interface Sparkle {
   id: number;
@@ -12,19 +13,9 @@ interface Sparkle {
   color: string;
 }
 
-const GOLD_PALETTE = [
-  "#FFD700",
-  "#FFC125",
-  "#EDBA3C",
-  "#F5D78E",
-  "#FFE4A0",
-  "#CD9B3C",
-  "#FFEC8B",
-];
-
 let counter = 0;
 
-function createSparkles(x: number, y: number, count = 20): Sparkle[] {
+function createSparkles(x: number, y: number, palette: string[], count = 20): Sparkle[] {
   return Array.from({ length: count }, () => {
     const angle = Math.random() * 360;
     return {
@@ -36,7 +27,7 @@ function createSparkles(x: number, y: number, count = 20): Sparkle[] {
       distance: 40 + Math.random() * 100,
       duration: 700 + Math.random() * 700,
       delay: Math.random() * 250,
-      color: GOLD_PALETTE[Math.floor(Math.random() * GOLD_PALETTE.length)],
+      color: palette[Math.floor(Math.random() * palette.length)],
     };
   });
 }
@@ -47,12 +38,13 @@ export interface SparkleEvent {
   key: number;
 }
 
-export function SparkleEffect({ event }: { event: SparkleEvent | null }) {
+export function SparkleEffect({ event, boardColor }: { event: SparkleEvent | null; boardColor?: string }) {
   const [sparkles, setSparkles] = useState<Sparkle[]>([]);
 
   useEffect(() => {
     if (!event) return;
-    const newSparkles = createSparkles(event.x, event.y);
+    const palette = getWizardTheme(boardColor || "#556B2F").palette;
+    const newSparkles = createSparkles(event.x, event.y, palette);
     setSparkles(newSparkles);
     const timer = setTimeout(() => setSparkles([]), 1700);
     return () => clearTimeout(timer);

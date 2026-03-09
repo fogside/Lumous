@@ -1,10 +1,12 @@
 import { useState, useRef } from "react";
+import { BoardTheme } from "../lib/types";
 
 interface Props {
   onAdd: (title: string) => void;
+  theme: BoardTheme;
 }
 
-export function NewCardInput({ onAdd }: Props) {
+export function NewCardInput({ onAdd, theme }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -28,11 +30,11 @@ export function NewCardInput({ onAdd }: Props) {
           width: "100%",
           textAlign: "left",
           fontSize: 13,
-          color: "rgba(255,255,255,0.25)",
+          color: theme.textTertiary,
           padding: "12px 16px",
           borderRadius: 12,
           background: "transparent",
-          border: "1px dashed rgba(255,255,255,0.08)",
+          border: `1px dashed ${theme.borderSubtle}`,
           cursor: "pointer",
           fontWeight: 500,
           transition: "all 0.15s",
@@ -64,12 +66,12 @@ export function NewCardInput({ onAdd }: Props) {
       placeholder="Card title..."
       style={{
         width: "100%",
-        background: "rgba(255,255,255,0.08)",
-        border: "1px solid rgba(255,255,255,0.12)",
+        background: theme.surface,
+        border: `1px solid ${theme.border}`,
         borderRadius: 12,
         padding: "14px 18px",
         fontSize: 14,
-        color: "white",
+        color: theme.text,
         outline: "none",
         fontWeight: 500,
       }}

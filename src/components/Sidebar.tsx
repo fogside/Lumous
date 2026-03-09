@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Board, Meta } from "../lib/types";
+import { Board, Meta, DARK_INK } from "../lib/types";
 import { SyncStatus } from "./SyncStatus";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CompletionHeatmap } from "./CompletionHeatmap";
@@ -31,6 +31,7 @@ interface Props {
   onOpenSyncSettings: () => void;
   collapsed: boolean;
   onToggle: () => void;
+  hideToggle?: boolean;
   shadowBoardId: string | null;
   onToggleShadowBoard: (id: string | null) => void;
 }
@@ -51,6 +52,7 @@ export function Sidebar({
   onOpenSyncSettings,
   collapsed,
   onToggle,
+  hideToggle,
   shadowBoardId,
   onToggleShadowBoard,
 }: Props) {
@@ -63,7 +65,7 @@ export function Sidebar({
       <div onMouseDown={startWindowDrag} style={{
         width: 72,
         minWidth: 72,
-        background: "#0c0c14",
+        background: DARK_INK,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -75,27 +77,29 @@ export function Sidebar({
         zIndex: 10,
         overflow: "hidden",
       }}>
-        <button
-          onClick={onToggle}
-          title="Show sidebar"
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "rgba(255,255,255,0.3)",
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            marginBottom: 28,
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
+        {!hideToggle && (
+          <button
+            onClick={onToggle}
+            title="Show sidebar"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "rgba(255,255,255,0.3)",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              marginBottom: 28,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, flex: 1, overflowY: "auto", width: "100%", paddingTop: 4, paddingBottom: 14 }}>
           {boardOrder.map((id) => {
@@ -152,7 +156,7 @@ export function Sidebar({
     <div onMouseDown={startWindowDrag} style={{
       width: 270,
       minWidth: 270,
-      background: "#0c0c14",
+      background: DARK_INK,
       display: "flex",
       flexDirection: "column",
       height: "100%",
@@ -303,7 +307,7 @@ export function Sidebar({
                       height: 7,
                       borderRadius: "50%",
                       border: "1.5px solid rgba(255,255,255,0.2)",
-                      background: "#0c0c14",
+                      background: DARK_INK,
                       flexShrink: 0,
                     }} />
                     <div style={{

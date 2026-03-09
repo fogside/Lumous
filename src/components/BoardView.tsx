@@ -11,7 +11,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { Board, Card as CardType, CardLabel } from "../lib/types";
+import { Board, Card as CardType, CardLabel, getBoardTheme, BoardTheme } from "../lib/types";
 import { Column } from "./Column";
 import { CardModal } from "./CardModal";
 import { SparkleEffect, SparkleEvent } from "./SparkleEffect";
@@ -28,7 +28,7 @@ interface Props {
   mode?: ViewMode;
 }
 
-function EditableTitle({ title, onSave, small }: { title: string; onSave: (t: string) => void; small?: boolean }) {
+function EditableTitle({ title, onSave, small, theme }: { title: string; onSave: (t: string) => void; small?: boolean; theme: BoardTheme }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -63,10 +63,10 @@ function EditableTitle({ title, onSave, small }: { title: string; onSave: (t: st
           background: "transparent",
           fontSize,
           fontWeight: 700,
-          color: "rgba(255,255,255,0.9)",
+          color: theme.text,
           outline: "none",
           border: "none",
-          borderBottom: "2px solid rgba(255,255,255,0.25)",
+          borderBottom: `2px solid ${theme.textTertiary}`,
           padding: "2px 6px",
           width: "auto",
           minWidth: 100,
@@ -84,7 +84,7 @@ function EditableTitle({ title, onSave, small }: { title: string; onSave: (t: st
       style={{
         fontSize,
         fontWeight: 700,
-        color: "rgba(255,255,255,0.9)",
+        color: theme.text,
         cursor: "text",
         transition: "color 0.15s",
         margin: 0,
@@ -116,6 +116,8 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
   const [wizardKey, setWizardKey] = useState(0);
   const [showWizard, setShowWizard] = useState(false);
   const [selectedTab, setSelectedTab] = useState("today");
+
+  const theme = getBoardTheme(board.backgroundColor);
 
   const handleLabelChange = useCallback((cardId: string, label: CardLabel) => {
     const card = board.cards[cardId];
@@ -234,6 +236,7 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
           title={board.title}
           onSave={(t) => onTitleChange?.(t)}
           small={isMedium}
+          theme={theme}
         />
       </div>
 
@@ -260,8 +263,8 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
                   padding: "8px 6px",
                   borderRadius: 8,
                   border: "none",
-                  background: isActive ? "rgba(255,255,255,0.12)" : "transparent",
-                  color: isActive ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
+                  background: isActive ? theme.surfaceHover : "transparent",
+                  color: isActive ? theme.text : theme.textTertiary,
                   fontSize: 10,
                   fontWeight: 700,
                   textTransform: "uppercase",
@@ -314,6 +317,8 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
                   onAddCard={(title) => addCard(column.id, title)}
                   onCardClick={(card) => setEditingCard({ card, columnId: column.id })}
                   onLabelChange={handleLabelChange}
+                  boardColor={board.backgroundColor}
+                  theme={theme}
                 />
               );
             })}
@@ -324,13 +329,13 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
               <div style={{
                 borderRadius: 14,
                 padding: "16px 20px",
-                background: "rgba(255,255,255,0.2)",
+                background: theme.overlay,
                 backdropFilter: "blur(12px)",
-                border: "1px solid rgba(255,255,255,0.15)",
+                border: `1px solid ${theme.border}`,
                 boxShadow: "0 20px 40px rgba(0,0,0,0.3)",
                 width: 240,
               }}>
-                <p style={{ fontSize: 15, color: "rgba(255,255,255,0.9)", fontWeight: 500, margin: 0 }}>
+                <p style={{ fontSize: 15, color: theme.text, fontWeight: 500, margin: 0 }}>
                   {activeCard.title}
                 </p>
               </div>
@@ -339,8 +344,8 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
         </DndContext>
       </div>
 
-      <SparkleEffect event={sparkleEvent} />
-      <WizardCelebration key={wizardKey} visible={showWizard} />
+      <SparkleEffect event={sparkleEvent} boardColor={board.backgroundColor} />
+      <WizardCelebration key={wizardKey} visible={showWizard} boardColor={board.backgroundColor} />
 
       {editingCard && (
         <CardModal
