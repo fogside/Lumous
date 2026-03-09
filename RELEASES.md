@@ -1,5 +1,38 @@
 # Releases
 
+## v1.3.0 — Ambient Wisps & UI Polish
+
+*2026-03-10*
+
+- **Background wisps** — subtle glowing particles drift across dark board backgrounds, color-matched to the board's sparkle theme (gold, ember, or sage); two layers for depth (bright + dim)
+- **Wisps toggle** — Sparkles icon in the top-right corner of the board toggles wisps on/off for both the board and sidebar simultaneously
+- **Sidebar wisps** — the left panel also gets ambient wisps for a cohesive magical feel
+- **Sidebar icons on hover** — shadow board (MoonStar) and delete (Trash2) icons only appear on hover of the active board row; MoonStar crossfades to Moon on hover
+- **Drag overlay matches card size** — dragged card overlay preserves the exact width of the original card instead of a fixed 240px
+- **Label glow clip fix** — the blurry label glow no longer turns square during hover/drag; uses `isolation: isolate` to keep the clip stable under CSS transforms
+- **lucide-react icons** — added icon library for consistent, polished UI icons throughout
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
+## v1.2.1 — Dark Board Borders
+
+*2026-03-09*
+
+- **Restored card borders for dark boards** — subtle borders and label-tinted gradient background on dark boards; light boards remain borderless
+- **`isLight` flag on BoardTheme** — enables conditional styling per board type
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
 ## v1.1.1 — Priority Labels
 
 *2026-03-09*

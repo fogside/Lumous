@@ -5,6 +5,8 @@ import { SyncStatus } from "./SyncStatus";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CompletionHeatmap } from "./CompletionHeatmap";
 import { UpdateChecker } from "./UpdateChecker";
+import { MoonStar, Moon, Trash2 } from "lucide-react";
+import { BackgroundWisps } from "./BackgroundWisps";
 
 function startWindowDrag(e: React.MouseEvent) {
   if (e.button !== 0) return;
@@ -34,6 +36,7 @@ interface Props {
   hideToggle?: boolean;
   shadowBoardId: string | null;
   onToggleShadowBoard: (id: string | null) => void;
+  showWisps?: boolean;
 }
 
 export function Sidebar({
@@ -55,6 +58,7 @@ export function Sidebar({
   hideToggle,
   shadowBoardId,
   onToggleShadowBoard,
+  showWisps = true,
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const deletingBoard = confirmDelete ? boards[confirmDelete] : null;
@@ -165,12 +169,16 @@ export function Sidebar({
       zIndex: 10,
       overflow: "hidden",
     }}>
+      <BackgroundWisps boardColor="#2B3A55" isLight={false} visible={showWisps} />
+
       {/* Header */}
       <div style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: "44px 24px 24px 24px",
+        position: "relative",
+        zIndex: 1,
       }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.15em" }}>
           Boards
@@ -206,7 +214,7 @@ export function Sidebar({
           const isShadowOpen = shadowBoardId === id;
           const hasLog = (board.completionLog?.length || 0) > 0;
           return (
-            <div key={id} style={{ marginBottom: 4 }}>
+            <div key={id} className="board-row" style={{ marginBottom: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <button
                   onClick={() => onSelectBoard(id)}
@@ -225,6 +233,7 @@ export function Sidebar({
                     cursor: "pointer",
                     transition: "all 0.15s",
                     minWidth: 0,
+                    position: "relative",
                   }}
                 >
                   <span
@@ -239,56 +248,62 @@ export function Sidebar({
                   <span style={{ fontSize: 15, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
                     {board.title}
                   </span>
-                  {/* Shadow board toggle icon */}
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleShadowBoard(isShadowOpen ? null : id);
-                    }}
-                    title="Completion history"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 22,
-                      height: 22,
-                      borderRadius: 6,
-                      flexShrink: 0,
-                      color: isShadowOpen ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.15)",
-                      transition: "all 0.15s",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <rect x="1" y="7" width="2" height="6" rx="0.5" fill="currentColor"/>
-                      <rect x="4.5" y="4" width="2" height="9" rx="0.5" fill="currentColor"/>
-                      <rect x="8" y="5.5" width="2" height="7.5" rx="0.5" fill="currentColor"/>
-                      <rect x="11.5" y="2" width="2" height="11" rx="0.5" fill="currentColor" opacity="0.6"/>
-                    </svg>
-                  </span>
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(id)}
-                  title="Delete board"
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 8,
+                  {/* Action icons — visible on hover, active board only */}
+                  {isActive && (
+                  <span className="board-row-actions" style={{
+                    position: "absolute",
+                    right: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    color: "rgba(255,255,255,0.35)",
-                    fontSize: 18,
-                    fontWeight: 300,
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    cursor: "pointer",
-                    flexShrink: 0,
-                    opacity: isActive ? 1 : 0,
-                    transition: "opacity 0.15s",
-                  }}
-                >
-                  ×
+                    gap: 8,
+                  }}>
+                    <span
+                      className="shadow-toggle"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleShadowBoard(isShadowOpen ? null : id);
+                      }}
+                      title={isShadowOpen ? "Hide insights" : "Show insights"}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 20,
+                        height: 20,
+                        borderRadius: 5,
+                        color: isShadowOpen ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.18)",
+                        transition: "all 0.15s",
+                        cursor: "pointer",
+                        position: "relative",
+                      }}
+                    >
+                      <span className="shadow-icon-default"><MoonStar size={13} strokeWidth={1.5} /></span>
+                      <span className="shadow-icon-hover"><Moon size={13} strokeWidth={1.5} /></span>
+                    </span>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmDelete(id);
+                      }}
+                      title="Delete board"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 20,
+                        height: 20,
+                        borderRadius: 5,
+                        color: "rgba(255,80,80,0.25)",
+                        transition: "all 0.15s",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Trash2 size={12} strokeWidth={1.5} />
+                    </span>
+                  </span>
+                  )}
                 </button>
               </div>
 
@@ -397,6 +412,17 @@ export function Sidebar({
           onOpenSettings={onOpenSyncSettings}
         />
       </div>
+
+      <style>{`
+        .board-row .board-row-actions { opacity: 0; transition: opacity 0.15s; }
+        .board-row:hover .board-row-actions { opacity: 1; }
+        .board-row .board-row-actions span:hover { color: rgba(255,255,255,0.7) !important; }
+        .shadow-toggle .shadow-icon-default,
+        .shadow-toggle .shadow-icon-hover { display: flex; align-items: center; justify-content: center; transition: opacity 0.15s; }
+        .shadow-toggle .shadow-icon-hover { position: absolute; inset: 0; opacity: 0; }
+        .shadow-toggle:hover .shadow-icon-default { opacity: 0; }
+        .shadow-toggle:hover .shadow-icon-hover { opacity: 1; }
+      `}</style>
 
       {/* Delete confirmation */}
       {confirmDelete && deletingBoard && (
