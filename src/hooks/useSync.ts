@@ -46,17 +46,11 @@ export function useSync(
         // Nothing to commit, that's fine
       }
 
-      // Try to pull then push
+      // Pull with local-wins strategy: local changes are always the source of truth
       try {
-        await gitRun(["pull", "--rebase", "origin", "main"]);
+        await gitRun(["pull", "-X", "ours", "origin", "main", "--no-edit"]);
       } catch {
-        // If rebase fails, abort and try merge with ours strategy
-        try {
-          await gitRun(["rebase", "--abort"]);
-        } catch { /* noop */ }
-        try {
-          await gitRun(["pull", "-X", "ours", "origin", "main", "--no-edit"]);
-        } catch { /* first push, no remote yet */ }
+        // First push — no remote history yet, that's fine
       }
 
       await gitRun(["push", "-u", "origin", "main"]);
