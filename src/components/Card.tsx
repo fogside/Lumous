@@ -107,10 +107,14 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
         padding: "10px 14px",
         marginBottom: 8,
         cursor: "grab",
-        background: card.label && labelColor
+        background: !theme.isLight && card.label && labelColor
           ? `linear-gradient(135deg, ${theme.surface} 50%, ${labelColor}18 100%)`
           : theme.surface,
-        border: "none",
+        border: theme.isLight
+          ? "none"
+          : card.label && labelColor
+            ? `1px solid ${labelColor}30`
+            : `1px solid ${theme.border}`,
         opacity: isDragging ? 0.4 : faded ? 0.4 : 1,
         overflow: "visible",
         userSelect: "none",

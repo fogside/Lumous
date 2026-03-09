@@ -111,6 +111,7 @@ export function isLightBoard(color: string): boolean {
 }
 
 export interface BoardTheme {
+  isLight: boolean;     // light board flag
   text: string;         // primary text
   textSecondary: string; // descriptions, muted
   textTertiary: string;  // timestamps, counts, hints
@@ -126,6 +127,7 @@ export interface BoardTheme {
 export function getBoardTheme(boardColor: string): BoardTheme {
   if (isLightBoard(boardColor)) {
     return {
+      isLight: true,
       text: "rgba(15,25,60,0.75)",
       textSecondary: "rgba(15,25,60,0.48)",
       textTertiary: "rgba(15,25,60,0.32)",
@@ -139,6 +141,7 @@ export function getBoardTheme(boardColor: string): BoardTheme {
     };
   }
   return {
+    isLight: false,
     text: "rgba(255,255,255,0.9)",
     textSecondary: "rgba(255,255,255,0.35)",
     textTertiary: "rgba(255,255,255,0.25)",
