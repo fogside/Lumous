@@ -245,7 +245,13 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
           {card.description}
         </p>
       )}
-      <span style={{ fontSize: 11, color: theme.textTertiary, marginTop: 8, display: "block", fontWeight: 400 }}>
+      <span style={{ fontSize: 11, color: theme.textTertiary, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontWeight: 400 }}>
+        {card.ritual && (
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, flexShrink: 0 }}>
+            <path d="M17 2l4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+            <path d="M7 22l-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" />
+          </svg>
+        )}
         {faded && card.completedAt
           ? `Done ${new Date(card.completedAt).toLocaleDateString()}`
           : new Date(card.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })

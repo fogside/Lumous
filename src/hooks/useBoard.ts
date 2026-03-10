@@ -1,5 +1,5 @@
 import { useReducer, useCallback, useEffect, useRef } from "react";
-import { Board, Card, createCard } from "../lib/types";
+import { Board, Card, Goal, createCard } from "../lib/types";
 import { saveBoard } from "../lib/storage";
 
 type Action =
@@ -7,7 +7,9 @@ type Action =
   | { type: "MOVE_CARD"; cardId: string; fromCol: string; toCol: string; toIndex: number }
   | { type: "ADD_CARD"; columnId: string; title: string }
   | { type: "UPDATE_CARD"; card: Card }
-  | { type: "DELETE_CARD"; cardId: string; columnId: string };
+  | { type: "DELETE_CARD"; cardId: string; columnId: string }
+  | { type: "SPAWN_RITUALS" }
+  | { type: "SET_GOALS"; goals: Goal[] };
 
 function boardReducer(state: Board | null, action: Action): Board | null {
   if (action.type === "SET_BOARD") return action.board;
@@ -36,15 +38,24 @@ function boardReducer(state: Board | null, action: Action): Board | null {
 
       const cards = { ...state.cards };
       let completionLog = state.completionLog || [];
+      let ritualLog = state.ritualLog || [];
       if (toCol === "completed" && fromCol !== "completed" && cards[cardId]) {
         const now = new Date().toISOString();
         cards[cardId] = { ...cards[cardId], completedAt: now };
         completionLog = [...completionLog, now];
+        // Log ritual completion
+        if (cards[cardId].ritual) {
+          ritualLog = [...ritualLog, {
+            date: now.slice(0, 10),
+            cardId,
+            goalId: cards[cardId].goalId,
+          }];
+        }
       } else if (fromCol === "completed" && toCol !== "completed" && cards[cardId]) {
         cards[cardId] = { ...cards[cardId], completedAt: null };
       }
 
-      return { ...state, columns, cards, completionLog };
+      return { ...state, columns, cards, completionLog, ritualLog };
     }
 
     case "ADD_CARD": {
@@ -79,6 +90,47 @@ function boardReducer(state: Board | null, action: Action): Board | null {
       const cards = { ...state.cards };
       delete cards[action.cardId];
       return { ...state, columns, cards };
+    }
+
+    case "SPAWN_RITUALS": {
+      const today = new Date().toISOString().slice(0, 10);
+      const dayOfWeek = new Date().getDay();
+      const completedCol = state.columns.find((c) => c.id === "completed");
+      if (!completedCol) return state;
+
+      const toRespawn: string[] = [];
+      for (const cardId of completedCol.cardIds) {
+        const card = state.cards[cardId];
+        if (!card?.ritual || !card.completedAt) continue;
+        if (card.completedAt.slice(0, 10) === today) continue;
+        const { schedule } = card.ritual;
+        const matches = schedule === "daily"
+          || (Array.isArray(schedule) && schedule.includes(dayOfWeek));
+        if (matches) toRespawn.push(cardId);
+      }
+
+      // Also check cards in "today" or "in-progress" that are rituals from a
+      // past day but not yet completed — leave them where they are (don't dup)
+      if (toRespawn.length === 0) return state;
+
+      const columns = state.columns.map((col) => {
+        if (col.id === "completed") {
+          return { ...col, cardIds: col.cardIds.filter((id) => !toRespawn.includes(id)) };
+        }
+        if (col.id === "today") {
+          return { ...col, cardIds: [...toRespawn, ...col.cardIds] };
+        }
+        return col;
+      });
+      const cards = { ...state.cards };
+      for (const id of toRespawn) {
+        cards[id] = { ...cards[id], completedAt: null };
+      }
+      return { ...state, columns, cards };
+    }
+
+    case "SET_GOALS": {
+      return { ...state, goals: action.goals };
     }
 
     default:
@@ -142,6 +194,28 @@ export function useBoard(
     return () => clearTimeout(saveTimeout.current);
   }, [board, onBoardChanged]);
 
+  // Spawn rituals on board load and on day change
+  const lastSpawnDate = useRef("");
+  useEffect(() => {
+    if (!board) return;
+    const today = new Date().toISOString().slice(0, 10);
+    if (lastSpawnDate.current === today && board === lastSetBoardRef.current) return;
+    lastSpawnDate.current = today;
+    dispatch({ type: "SPAWN_RITUALS" });
+  }, [board?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Check for day change every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const today = new Date().toISOString().slice(0, 10);
+      if (lastSpawnDate.current !== today) {
+        lastSpawnDate.current = today;
+        dispatch({ type: "SPAWN_RITUALS" });
+      }
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const moveCard = useCallback(
     (cardId: string, fromCol: string, toCol: string, toIndex: number) => {
       dispatch({ type: "MOVE_CARD", cardId, fromCol, toCol, toIndex });
@@ -161,5 +235,9 @@ export function useBoard(
     dispatch({ type: "DELETE_CARD", cardId, columnId });
   }, []);
 
-  return { board, dispatch, moveCard, addCard, updateCard, deleteCard };
+  const setGoals = useCallback((goals: Goal[]) => {
+    dispatch({ type: "SET_GOALS", goals });
+  }, []);
+
+  return { board, dispatch, moveCard, addCard, updateCard, deleteCard, setGoals };
 }

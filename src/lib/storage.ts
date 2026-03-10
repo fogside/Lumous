@@ -12,7 +12,27 @@ export async function saveMeta(meta: Meta): Promise<void> {
 
 export async function loadBoard(id: string): Promise<Board> {
   const json = await invoke<string>("load_board", { id });
-  return JSON.parse(json);
+  const board: Board = JSON.parse(json);
+
+  // Migrate: move card.ritual.goalId → card.goalId (schema change)
+  let migrated = false;
+  for (const card of Object.values(board.cards)) {
+    const ritualAny = card.ritual as Record<string, unknown> | undefined;
+    if (ritualAny?.goalId && !card.goalId) {
+      card.goalId = ritualAny.goalId as string;
+      delete ritualAny.goalId;
+      migrated = true;
+    }
+  }
+  if (migrated) {
+    // Persist the migration so it only runs once
+    await invoke("save_board", {
+      id: board.id,
+      data: JSON.stringify(board, null, 2),
+    });
+  }
+
+  return board;
 }
 
 export async function saveBoard(board: Board): Promise<void> {

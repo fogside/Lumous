@@ -396,6 +396,7 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
         <CardModal
           card={editingCard.card}
           columnId={editingCard.columnId}
+          goals={board.goals}
           onSave={updateCard}
           onDelete={deleteCard}
           onClose={() => setEditingCard(null)}

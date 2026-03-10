@@ -12,6 +12,23 @@ export const CARD_LABELS: { value: CardLabel; color: string; name: string }[] = 
   { value: "ultramarine", color: "#8a6de8", name: "Ultramarine" },
 ];
 
+export type RitualSchedule = "daily" | number[]; // number[] = days of week (0=Sun … 6=Sat)
+
+export interface RitualLogEntry {
+  date: string;   // YYYY-MM-DD
+  cardId: string;
+  goalId?: string;
+}
+
+export interface Goal {
+  id: string;
+  name: string;
+  color: string; // hex color
+  why?: string;  // optional motivation — "why is this goal important?"
+  deadline?: string; // YYYY-MM-DD target completion date
+  createdAt?: string; // ISO timestamp
+}
+
 export interface Card {
   id: string;
   title: string;
@@ -19,6 +36,10 @@ export interface Card {
   createdAt: string;
   completedAt: string | null;
   label?: CardLabel;
+  goalId?: string;  // independent goal assignment
+  ritual?: {
+    schedule: RitualSchedule;
+  };
 }
 
 export interface Column {
@@ -34,6 +55,8 @@ export interface Board {
   columns: Column[];
   cards: Record<string, Card>;
   completionLog?: string[]; // ISO timestamps of each task completion
+  goals?: Goal[];
+  ritualLog?: RitualLogEntry[];
 }
 
 export interface Settings {

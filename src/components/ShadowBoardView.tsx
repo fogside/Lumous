@@ -1,89 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Board, getBoardTheme } from "../lib/types";
+import { Board, Goal, Card, RitualLogEntry, CARD_LABELS, getBoardTheme } from "../lib/types";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface Props {
   board: Board;
   onClose: () => void;
-}
-
-// ─── Utilities ───
-
-function groupByDate(timestamps: string[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const ts of timestamps) {
-    const date = ts.slice(0, 10);
-    counts[date] = (counts[date] || 0) + 1;
-  }
-  return counts;
-}
-
-function getLastNWeeks(n: number): string[] {
-  const days: string[] = [];
-  const total = n * 7;
-  const now = new Date();
-  for (let i = total - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
-  }
-  return days;
-}
-
-function getIntensity(count: number, max: number): number {
-  if (count === 0) return 0;
-  if (max <= 1) return 4;
-  const ratio = count / max;
-  if (ratio >= 0.75) return 4;
-  if (ratio >= 0.5) return 3;
-  if (ratio >= 0.25) return 2;
-  return 1;
-}
-
-function intensityToAlpha(intensity: number): number {
-  switch (intensity) {
-    case 0: return 0.06;
-    case 1: return 0.25;
-    case 2: return 0.45;
-    case 3: return 0.65;
-    case 4: return 0.9;
-    default: return 0.06;
-  }
-}
-
-const DAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-// ─── Demo data ───
-
-function generateDemoData(): { completionLog: string[]; creationTimestamps: string[] } {
-  const completionLog: string[] = [];
-  const creationTimestamps: string[] = [];
-  const now = new Date();
-  for (let i = 90; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const dayOfWeek = d.getDay();
-    const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
-    const baseChance = isWeekday ? 0.7 : 0.25;
-    if (Math.random() < baseChance) {
-      const count = Math.floor(Math.random() * 4) + 1;
-      for (let c = 0; c < count; c++) {
-        const ts = new Date(d);
-        ts.setHours(9 + Math.floor(Math.random() * 10), Math.floor(Math.random() * 60));
-        completionLog.push(ts.toISOString());
-      }
-    }
-    if (Math.random() < baseChance * 1.1) {
-      const count = Math.floor(Math.random() * 5) + 1;
-      for (let c = 0; c < count; c++) {
-        const ts = new Date(d);
-        ts.setHours(8 + Math.floor(Math.random() * 12), Math.floor(Math.random() * 60));
-        creationTimestamps.push(ts.toISOString());
-      }
-    }
-  }
-  return { completionLog, creationTimestamps };
+  onUpdateBoard?: (board: Board) => void;
 }
 
 // ─── Tooltip ───
@@ -105,252 +28,487 @@ function Tooltip({ x, y, children }: { x: number; y: number; children: React.Rea
   );
 }
 
-// ─── HeatmapGrid (fills available space) ───
+// ─── Goal stats computation ───
 
-function HeatmapGrid({ counts, days, color, theme }: {
-  counts: Record<string, number>;
-  days: string[];
+interface GoalDayData {
+  date: string;
+  isScheduled: boolean;
+  isCompleted: boolean;
+  isToday: boolean;
+}
+
+function computeGoalStats(
+  goalId: string,
+  ritualLog: RitualLogEntry[],
+  cards: Record<string, Card>,
+  numPastDays: number = 90,
+) {
+  const ritualCards = Object.values(cards).filter((c) => c.goalId === goalId && c.ritual);
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const days: GoalDayData[] = [];
+
+  for (let i = numPastDays - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const dayOfWeek = d.getDay();
+    const isScheduled = ritualCards.some((card) => {
+      if (!card.ritual) return false;
+      if (card.ritual.schedule === "daily") return true;
+      return Array.isArray(card.ritual.schedule) && card.ritual.schedule.includes(dayOfWeek);
+    });
+    const isCompleted = ritualLog.some((entry) => entry.date === dateStr && entry.goalId === goalId);
+    days.push({ date: dateStr, isScheduled, isCompleted, isToday: dateStr === todayStr });
+  }
+
+  let currentStreak = 0;
+  let bestStreak = 0;
+  let tempStreak = 0;
+  let scheduledDays = 0;
+  let completedDays = 0;
+
+  for (const day of days) {
+    if (!day.isScheduled) continue;
+    scheduledDays++;
+    if (day.isCompleted) {
+      completedDays++;
+      tempStreak++;
+      bestStreak = Math.max(bestStreak, tempStreak);
+    } else {
+      tempStreak = 0;
+    }
+  }
+
+  currentStreak = 0;
+  for (let i = days.length - 1; i >= 0; i--) {
+    if (!days[i].isScheduled) continue;
+    if (days[i].isCompleted) currentStreak++;
+    else break;
+  }
+
+  const completionRate = scheduledDays > 0 ? Math.round((completedDays / scheduledDays) * 100) : 0;
+  return { days, currentStreak, bestStreak, completionRate, scheduledDays, completedDays };
+}
+
+// ─── Goal streak strip (wraps to multiple rows) ───
+
+function GoalStreakStrip({ days, color, theme }: {
+  days: GoalDayData[];
   color: string;
   theme: ReturnType<typeof getBoardTheme>;
 }) {
-  const [hover, setHover] = useState<{ day: string; x: number; y: number } | null>(null);
-  const max = Math.max(...Object.values(counts), 0);
-  const weeks: string[][] = [];
-  let currentWeek: string[] = [];
-  const firstDayOfWeek = new Date(days[0]).getDay();
-  for (let i = 0; i < firstDayOfWeek; i++) currentWeek.push("");
-  for (const day of days) {
-    currentWeek.push(day);
-    if (currentWeek.length === 7) { weeks.push(currentWeek); currentWeek = []; }
-  }
-  if (currentWeek.length > 0) {
-    while (currentWeek.length < 7) currentWeek.push("");
-    weeks.push(currentWeek);
-  }
+  const [hover, setHover] = useState<{ label: string; x: number; y: number } | null>(null);
 
-  const monthLabels: { weekIndex: number; label: string }[] = [];
-  let lastMonth = -1;
-  weeks.forEach((week, wi) => {
-    const firstDay = week.find((d) => d !== "");
-    if (!firstDay) return;
-    const month = new Date(firstDay).getMonth();
-    if (month !== lastMonth) { monthLabels.push({ weekIndex: wi, label: MONTH_NAMES[month] }); lastMonth = month; }
-  });
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 
-  const gap = 3;
-  const hoverCount = hover ? (counts[hover.day] || 0) : 0;
-  const hoverFormatted = hover
-    ? new Date(hover.day).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
-    : "";
+  const handleHover = (e: React.MouseEvent, date: string, status: string) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHover({ label: `${formatDate(date)}${status ? " — " + status : ""}`, x: rect.left + rect.width / 2, y: rect.top });
+  };
+
+  // Group into weeks
+  const weeks: GoalDayData[][] = [];
+  for (let i = 0; i < days.length; i += 7) {
+    weeks.push(days.slice(i, i + 7));
+  }
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, position: "relative" }}
+    <div style={{ position: "relative" }}
       onMouseLeave={() => setHover(null)}
     >
       {hover && (
-        <Tooltip x={hover.x} y={hover.y}>
-          {hoverFormatted} — <span style={{ color }}>{hoverCount}</span> task{hoverCount !== 1 ? "s" : ""}
-        </Tooltip>
+        <Tooltip x={hover.x} y={hover.y}>{hover.label}</Tooltip>
       )}
-      {/* Month labels */}
-      <div style={{ display: "flex", paddingLeft: 32, marginBottom: 4, gap }}>
-        {weeks.map((_, wi) => {
-          const ml = monthLabels.find((m) => m.weekIndex === wi);
-          return (
-            <div key={wi} style={{
-              flex: 1, fontSize: 11, color: theme.textTertiary, fontWeight: 600,
-              whiteSpace: "nowrap", overflow: "visible",
-            }}>
-              {ml?.label || ""}
-            </div>
-          );
-        })}
-      </div>
-      {/* Grid with day labels */}
-      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap, width: 32, flexShrink: 0 }}>
-          {DAY_LABELS.map((l, i) => (
-            <div key={i} style={{
-              flex: 1, fontSize: 11, color: theme.textTertiary,
-              fontWeight: 600, display: "flex", alignItems: "center",
-            }}>{l}</div>
-          ))}
-        </div>
-        <div style={{ flex: 1, display: "flex", gap, minWidth: 0 }}>
-          {weeks.map((week, wi) => (
-            <div key={wi} style={{ flex: 1, display: "flex", flexDirection: "column", gap }}>
-              {week.map((day, di) => {
-                if (!day) return <div key={di} style={{ flex: 1, borderRadius: 3 }} />;
-                const count = counts[day] || 0;
-                const intensity = getIntensity(count, max);
-                const alpha = intensityToAlpha(intensity);
-                const isHovered = hover?.day === day;
+      {/* flexWrap lets it flow to multiple rows naturally */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+        {weeks.map((week, wi) => (
+          <div key={wi} style={{ display: "flex", gap: 2 }}>
+            {week.map((day) => {
+              if (!day.isScheduled) {
                 return (
                   <div
-                    key={day}
-                    onMouseEnter={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      setHover({ day, x: rect.left + rect.width / 2, y: rect.top });
-                    }}
+                    key={day.date}
+                    onMouseEnter={(e) => handleHover(e, day.date, "")}
                     style={{
-                      flex: 1, borderRadius: 3,
-                      backgroundColor: count > 0 ? color : theme.surface,
-                      opacity: count > 0 ? alpha : 1,
+                      width: 4, height: 4, borderRadius: 2,
+                      background: theme.borderSubtle,
+                      margin: "2.5px 0.5px",
                       cursor: "default",
-                      outline: isHovered ? `2px solid ${theme.textSecondary}` : "none",
-                      outlineOffset: -1,
-                      transition: "outline 0.1s",
                     }}
                   />
                 );
-              })}
-            </div>
-          ))}
-        </div>
+              }
+              if (day.isCompleted) {
+                return (
+                  <div
+                    key={day.date}
+                    onMouseEnter={(e) => handleHover(e, day.date, "Done")}
+                    style={{
+                      width: 9, height: 9, borderRadius: 5,
+                      background: color,
+                      filter: `drop-shadow(0 0 3px ${color}80)`,
+                      outline: day.isToday ? `2px solid ${theme.text}` : "none",
+                      outlineOffset: 1,
+                      cursor: "default",
+                    }}
+                  />
+                );
+              }
+              return (
+                <div
+                  key={day.date}
+                  onMouseEnter={(e) => handleHover(e, day.date, "Missed")}
+                  style={{
+                    width: 9, height: 9, borderRadius: 5,
+                    border: `1.5px solid ${color}40`,
+                    background: "transparent",
+                    boxSizing: "border-box",
+                    outline: day.isToday ? `2px solid ${theme.text}` : "none",
+                    outlineOffset: 1,
+                    cursor: "default",
+                  }}
+                />
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-// ─── DailyPlot (SVG area chart) ───
+// ─── Goal card ───
 
-function DailyPlot({ counts, days, color, label, total, theme }: {
-  counts: Record<string, number>;
-  days: string[];
-  color: string;
-  label: string;
-  total: number;
+function formatDeadlineLabel(deadline: string): string {
+  const now = new Date();
+  const dl = new Date(deadline + "T12:00:00");
+  const diffMs = dl.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return "Past deadline";
+  if (diffDays === 0) return "Due today";
+  if (diffDays === 1) return "1 day left";
+  if (diffDays < 7) return `${diffDays} days left`;
+  if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks left`;
+  return `${Math.ceil(diffDays / 30)} months left`;
+}
+
+function DeadlineTimeline({ goal, theme }: {
+  goal: Goal;
   theme: ReturnType<typeof getBoardTheme>;
 }) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  if (!goal.deadline) return null;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const startStr = goal.createdAt?.slice(0, 10) || todayStr;
+  const start = new Date(startStr + "T12:00:00");
+  const end = new Date(goal.deadline + "T12:00:00");
+  const now = new Date();
+  const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  const elapsedDays = Math.max(0, Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  const progress = Math.min(1, Math.max(0, elapsedDays / totalDays));
+  const isPast = goal.deadline < todayStr;
 
-  const values = days.map((d) => counts[d] || 0);
-  const max = Math.max(...values, 1);
-
-  // 3-day rolling average
-  const smoothed = values.map((_, i) => {
-    const start = Math.max(0, i - 1);
-    const end = Math.min(values.length - 1, i + 1);
-    let sum = 0, count = 0;
-    for (let j = start; j <= end; j++) { sum += values[j]; count++; }
-    return sum / count;
+  const deadlineFormatted = new Date(goal.deadline + "T12:00:00").toLocaleDateString(undefined, {
+    month: "short", day: "numeric", year: end.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
   });
-
-  const w = 400;
-  const h = 140;
-  const padTop = 6;
-  const padBot = 28;
-  const plotH = h - padTop - padBot;
-
-  const pointCoords = smoothed.map((v, i) => ({
-    x: (i / (smoothed.length - 1)) * w,
-    y: padTop + plotH - (v / max) * plotH,
-  }));
-
-  const linePath = `M${pointCoords.map((p) => `${p.x},${p.y}`).join(" L")}`;
-  const areaPath = `${linePath} L${w},${padTop + plotH} L0,${padTop + plotH} Z`;
-
-  // Month tick labels
-  const monthTicks: { x: number; label: string }[] = [];
-  let prevMonth = -1;
-  days.forEach((d, i) => {
-    const month = new Date(d).getMonth();
-    if (month !== prevMonth) {
-      monthTicks.push({ x: (i / (days.length - 1)) * w, label: MONTH_NAMES[month] });
-      prevMonth = month;
-    }
-  });
-
-  const activeDays = values.filter((v) => v > 0).length;
-  const avg = activeDays > 0 ? (total / activeDays).toFixed(1) : "0";
-
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
-
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const relX = (e.clientX - rect.left) / rect.width;
-    const idx = Math.round(relX * (days.length - 1));
-    const clamped = Math.max(0, Math.min(days.length - 1, idx));
-    setHoverIdx(clamped);
-    // Convert SVG coord to screen coord for the DOM tooltip
-    const screenX = rect.left + (pointCoords[clamped].x / w) * rect.width;
-    const screenY = rect.top + (pointCoords[clamped].y / h) * rect.height;
-    setTooltipPos({ x: screenX, y: screenY });
-  };
-
-  const hoverDay = hoverIdx !== null ? days[hoverIdx] : null;
-  const hoverVal = hoverIdx !== null ? values[hoverIdx] : 0;
-  const hoverCoord = hoverIdx !== null ? pointCoords[hoverIdx] : null;
-  const hoverFormatted = hoverDay
-    ? new Date(hoverDay).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
-    : "";
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4, flexShrink: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: theme.textSecondary, fontVariantNumeric: "tabular-nums" }}>
-          {total} total
-        </span>
-        <span style={{ fontSize: 12, color: theme.textTertiary, fontWeight: 500 }}>
-          {avg} avg/active day
+    <div style={{ marginTop: 10 }}>
+      <div style={{ position: "relative", height: 6, borderRadius: 3, background: theme.surface, overflow: "hidden" }}>
+        <div style={{
+          position: "absolute", left: 0, top: 0, bottom: 0,
+          width: `${progress * 100}%`,
+          borderRadius: 3,
+          background: isPast ? "rgba(220,80,80,0.5)" : `${goal.color}60`,
+        }} />
+        {!isPast && progress > 0 && progress < 1 && (
+          <div style={{
+            position: "absolute", left: `${progress * 100}%`, top: -1, bottom: -1,
+            width: 2, borderRadius: 1,
+            background: theme.text,
+            transform: "translateX(-1px)",
+          }} />
+        )}
+      </div>
+      <div style={{
+        display: "flex", justifyContent: "space-between", marginTop: 4,
+        fontSize: 10, fontWeight: 600, color: theme.textTertiary,
+        fontVariantNumeric: "tabular-nums",
+      }}>
+        <span>{isPast ? "Past deadline" : formatDeadlineLabel(goal.deadline)}</span>
+        <span style={{ color: isPast ? "rgba(220,80,80,0.6)" : theme.textTertiary }}>
+          {deadlineFormatted}
         </span>
       </div>
-      {tooltipPos && hoverIdx !== null && (
-        <Tooltip x={tooltipPos.x} y={tooltipPos.y}>
-          {hoverFormatted} — <span style={{ color }}>{hoverVal}</span>
-        </Tooltip>
+    </div>
+  );
+}
+
+function GoalCard({ goal, stats, cardCount, ritualCount, theme, onDelete }: {
+  goal: Goal;
+  stats: ReturnType<typeof computeGoalStats>;
+  cardCount: number;
+  ritualCount: number;
+  theme: ReturnType<typeof getBoardTheme>;
+  onDelete: () => void;
+}) {
+  const hasRituals = ritualCount > 0;
+  const hasCards = cardCount > 0;
+
+  return (
+    <div
+      className="goal-card"
+      style={{
+        padding: "14px 18px",
+        borderRadius: 12,
+        background: theme.surface,
+        border: `1px solid ${theme.border}`,
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* Glow */}
+      <div style={{
+        position: "absolute", inset: 0, borderRadius: "inherit",
+        overflow: "hidden", pointerEvents: "none",
+      }}>
+        <div style={{
+          position: "absolute", top: -20, right: -20,
+          width: 100, height: 100,
+          background: `radial-gradient(circle, ${goal.color}40 0%, transparent 70%)`,
+        }} />
+      </div>
+
+      {/* Delete button */}
+      <button
+        className="goal-delete-btn"
+        onClick={onDelete}
+        data-no-drag
+        style={{
+          position: "absolute", top: 8, right: 8,
+          width: 18, height: 18, borderRadius: 5,
+          background: "transparent", border: "none",
+          color: theme.textTertiary, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 12, padding: 0,
+          opacity: 0, transition: "opacity 0.15s",
+        }}
+      >
+        ×
+      </button>
+
+      {/* Header: color dot + name + streak flame (padded right to avoid delete btn overlap) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 22 }}>
+        <div style={{
+          width: 10, height: 10, borderRadius: 5,
+          background: goal.color,
+          filter: `drop-shadow(0 0 4px ${goal.color}60)`,
+          flexShrink: 0,
+        }} />
+        <span style={{ fontSize: 14, fontWeight: 600, color: theme.text, flex: 1 }}>
+          {goal.name}
+        </span>
+
+        {hasRituals && stats.currentStreak > 0 && (
+          <span style={{
+            display: "flex", alignItems: "center", gap: 3,
+            fontSize: 16, fontWeight: 800, color: goal.color,
+            fontVariantNumeric: "tabular-nums",
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill={goal.color} stroke="none" style={{ opacity: 0.9 }}>
+              <path d="M12 23c-3.866 0-7-2.686-7-6 0-2.418 1.613-4.16 2.5-5l1.5 2c.322-.905.5-2 .5-3 0-1.5-.5-3.5-2-5 2.033.506 4 2.5 5 4.5C13 9 13 7.5 12 5c3 1.5 6 5 6 9.5 0 4.171-2.686 8.5-6 8.5z"/>
+            </svg>
+            {stats.currentStreak}
+          </span>
+        )}
+      </div>
+
+      {/* Why */}
+      {goal.why && (
+        <div style={{
+          fontSize: 12, color: theme.textSecondary, marginTop: 6,
+          lineHeight: 1.5, fontStyle: "italic",
+        }}>
+          {goal.why}
+        </div>
       )}
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${w} ${h}`}
-          preserveAspectRatio="xMidYMid meet"
-          style={{ width: "100%", height: "100%", display: "block" }}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => { setHoverIdx(null); setTooltipPos(null); }}
+
+      {hasRituals && (
+        <div style={{ marginTop: 10 }}>
+          <GoalStreakStrip days={stats.days} color={goal.color} theme={theme} />
+
+          <div style={{
+            display: "flex", gap: 16, marginTop: 10, fontSize: 11,
+            color: theme.textTertiary, fontWeight: 500, fontVariantNumeric: "tabular-nums",
+          }}>
+            <span>
+              <span style={{ fontWeight: 700, color: theme.textSecondary }}>{stats.completionRate}%</span> rate
+            </span>
+            <span>
+              <span style={{ fontWeight: 700, color: theme.textSecondary }}>{stats.bestStreak}</span> best streak
+            </span>
+            <span>
+              <span style={{ fontWeight: 700, color: theme.textSecondary }}>{stats.completedDays}</span>/{stats.scheduledDays} days
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Deadline timeline */}
+      <DeadlineTimeline goal={goal} theme={theme} />
+
+      {/* Card count */}
+      {hasCards && (
+        <div style={{
+          fontSize: 11, color: theme.textTertiary, fontWeight: 500,
+          marginTop: hasRituals || goal.deadline ? 6 : 10, fontVariantNumeric: "tabular-nums",
+        }}>
+          {cardCount} card{cardCount !== 1 ? "s" : ""}
+          {ritualCount > 0 && ` · ${ritualCount} ritual${ritualCount !== 1 ? "s" : ""}`}
+        </div>
+      )}
+
+      {!hasCards && !goal.why && !goal.deadline && (
+        <div style={{ fontSize: 12, color: theme.textTertiary, marginTop: 6 }}>
+          Assign cards to this goal from card settings
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Add Goal form ───
+
+const GOAL_COLORS = CARD_LABELS.filter((l) => l.value).map((l) => l.color);
+
+function AddGoalForm({ theme, onAdd, onCancel }: {
+  theme: ReturnType<typeof getBoardTheme>;
+  onAdd: (name: string, color: string, why?: string, deadline?: string) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [why, setWhy] = useState("");
+  const [deadline, setDeadline] = useState("");
+  const [color, setColor] = useState(GOAL_COLORS[0]);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const submit = () => {
+    if (name.trim()) onAdd(name.trim(), color, why.trim() || undefined, deadline || undefined);
+  };
+
+  return (
+    <div style={{
+      padding: "14px 18px",
+      borderRadius: 12,
+      background: theme.surfaceFaint,
+      border: `1px solid ${theme.border}`,
+      display: "flex", flexDirection: "column", gap: 10,
+    }}>
+      <input
+        ref={inputRef}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && name.trim()) submit();
+          if (e.key === "Escape") onCancel();
+        }}
+        placeholder="Goal name..."
+        data-no-drag
+        style={{
+          background: "transparent", border: "none",
+          borderBottom: `1px solid ${theme.border}`,
+          fontSize: 14, fontWeight: 600, color: theme.text,
+          outline: "none", padding: "4px 0",
+        }}
+      />
+      <input
+        value={why}
+        onChange={(e) => setWhy(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && name.trim()) submit();
+          if (e.key === "Escape") onCancel();
+        }}
+        placeholder="Why is this important to you? (optional)"
+        data-no-drag
+        style={{
+          background: "transparent", border: "none",
+          borderBottom: `1px solid ${theme.border}`,
+          fontSize: 12, fontWeight: 400, color: theme.textSecondary,
+          outline: "none", padding: "4px 0", fontStyle: "italic",
+        }}
+      />
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: theme.textTertiary, whiteSpace: "nowrap" }}>
+          Target date
+        </span>
+        <input
+          type="date"
+          value={deadline}
+          onChange={(e) => setDeadline(e.target.value)}
+          data-no-drag
+          style={{
+            background: "transparent", border: `1px solid ${theme.border}`,
+            borderRadius: 6, padding: "3px 8px",
+            fontSize: 12, color: deadline ? theme.text : theme.textTertiary,
+            outline: "none", cursor: "pointer",
+            colorScheme: theme.isLight ? "light" : "dark",
+          }}
+        />
+        {deadline && (
+          <button
+            onClick={() => setDeadline("")}
+            data-no-drag
+            style={{
+              background: "transparent", border: "none",
+              color: theme.textTertiary, cursor: "pointer",
+              fontSize: 12, padding: "2px 4px",
+            }}
+          >
+            ×
+          </button>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+        {GOAL_COLORS.map((c) => (
+          <button
+            key={c}
+            onClick={() => setColor(c)}
+            data-no-drag
+            style={{
+              width: 18, height: 18, borderRadius: 6,
+              background: c, cursor: "pointer", padding: 0,
+              border: c === color ? `2px solid ${theme.text}` : `1px solid ${theme.border}`,
+              transition: "all 0.15s",
+            }}
+          />
+        ))}
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={onCancel}
+          data-no-drag
+          style={{
+            padding: "4px 12px", borderRadius: 7, fontSize: 12, fontWeight: 500,
+            background: "transparent", border: `1px solid ${theme.border}`,
+            color: theme.textSecondary, cursor: "pointer",
+          }}
         >
-          <defs>
-            <linearGradient id={`grad-${label}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-              <stop offset="100%" stopColor={color} stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-          {/* Grid lines */}
-          {[0.25, 0.5, 0.75].map((r) => (
-            <line key={r}
-              x1={0} y1={padTop + plotH * (1 - r)} x2={w} y2={padTop + plotH * (1 - r)}
-              stroke={theme.borderSubtle} strokeWidth="0.5"
-            />
-          ))}
-          {/* Area fill */}
-          <path d={areaPath} fill={`url(#grad-${label})`} />
-          {/* Line */}
-          <path d={linePath} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" opacity="0.7" />
-          {/* Hover crosshair + dot */}
-          {hoverCoord && (
-            <>
-              <line
-                x1={hoverCoord.x} y1={padTop} x2={hoverCoord.x} y2={padTop + plotH}
-                stroke={theme.textTertiary} strokeWidth="1" strokeDasharray="3,3"
-              />
-              <circle
-                cx={hoverCoord.x} cy={hoverCoord.y} r="5"
-                fill={color} stroke={theme.text} strokeWidth="2"
-              />
-            </>
-          )}
-          {/* Month labels — tilted */}
-          {monthTicks.map((t, i) => (
-            <text key={i} x={0} y={0}
-              transform={`translate(${t.x + 4}, ${h - 4}) rotate(-40)`}
-              fill={theme.textTertiary} fontSize="12" fontWeight="600"
-              textAnchor="start"
-            >{t.label}</text>
-          ))}
-        </svg>
+          Cancel
+        </button>
+        <button
+          onClick={submit}
+          data-no-drag
+          style={{
+            padding: "4px 12px", borderRadius: 7, fontSize: 12, fontWeight: 600,
+            background: theme.surfaceHover, border: `1px solid ${theme.border}`,
+            color: theme.text, cursor: "pointer",
+            opacity: name.trim() ? 1 : 0.4,
+          }}
+        >
+          Create
+        </button>
       </div>
     </div>
   );
@@ -367,62 +525,75 @@ function startWindowDrag(e: React.MouseEvent) {
   getCurrentWindow().startDragging();
 }
 
-function computeStreaks(counts: Record<string, number>, days: string[]) {
-  let bestStreak = 0, cur = 0, streak = 0;
-  for (const day of days) {
-    if ((counts[day] || 0) > 0) { cur++; bestStreak = Math.max(bestStreak, cur); }
-    else cur = 0;
-  }
-  for (let i = days.length - 1; i >= 0; i--) {
-    if ((counts[days[i]] || 0) > 0) streak++;
-    else break;
-  }
-  const activeDays = days.filter((d) => (counts[d] || 0) > 0).length;
-  const maxDay = Math.max(...days.map((d) => counts[d] || 0), 0);
-  return { bestStreak, streak, activeDays, maxDay };
-}
-
-function Indicators({ items, theme }: { items: { value: string | number; label: string }[]; theme: ReturnType<typeof getBoardTheme> }) {
-  return (
-    <div style={{
-      display: "flex", gap: 16, marginTop: 10, fontSize: 12,
-      color: theme.textTertiary, fontWeight: 500, fontVariantNumeric: "tabular-nums",
-      flexShrink: 0,
-    }}>
-      {items.map((item, i) => (
-        <span key={i}>
-          <span style={{ color: theme.textSecondary, fontWeight: 700 }}>{item.value}</span>
-          {" "}{item.label}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-export function ShadowBoardView({ board, onClose }: Props) {
+export function ShadowBoardView({ board, onClose, onUpdateBoard }: Props) {
   const theme = getBoardTheme(board.backgroundColor);
-  const numWeeks = 13;
-  const days = getLastNWeeks(numWeeks);
+  const [addingGoal, setAddingGoal] = useState(false);
+  const [deletingGoal, setDeletingGoal] = useState<Goal | null>(null);
 
-  const hasRealData = (board.completionLog?.length || 0) > 0 ||
-    Object.values(board.cards).some((c) => c.completedAt);
+  // Optimistic goals: use ref to avoid re-render cycles from useEffect syncing
+  const optimisticGoalsRef = useRef<Goal[] | null>(null);
+  const goals = optimisticGoalsRef.current ?? board.goals ?? [];
 
-  const [showDemo] = useState(!hasRealData);
-  const [demoData] = useState(() => generateDemoData());
+  // Clear optimistic state once board.goals catches up (same IDs)
+  if (optimisticGoalsRef.current && board.goals) {
+    const boardIds = board.goals.map((g) => g.id).join(",");
+    const optIds = optimisticGoalsRef.current.map((g) => g.id).join(",");
+    if (boardIds === optIds) optimisticGoalsRef.current = null;
+  }
 
-  const completionTimestamps = showDemo ? demoData.completionLog : (board.completionLog || []);
-  const creationTimestamps = showDemo
-    ? demoData.creationTimestamps
-    : Object.values(board.cards).map((c) => c.createdAt);
+  // Stable goal data — only recompute when card-goal assignments actually change
+  const cardGoalKey = useMemo(() => {
+    return Object.values(board.cards)
+      .filter((c) => c.goalId)
+      .map((c) => `${c.id}:${c.goalId}:${c.ritual ? "r" : ""}:${c.completedAt ? "d" : ""}`)
+      .sort()
+      .join("|");
+  }, [board.cards]);
 
-  const completionCounts = groupByDate(completionTimestamps);
-  const creationCounts = groupByDate(creationTimestamps);
+  const ritualLogLength = board.ritualLog?.length ?? 0;
 
-  const periodCompletions = completionTimestamps.filter((ts) => days.includes(ts.slice(0, 10)));
-  const periodCreations = creationTimestamps.filter((ts) => days.includes(ts.slice(0, 10)));
+  const goalData = useMemo(() => {
+    const cards = board.cards;
+    const ritualLog = board.ritualLog || [];
+    return goals.map((goal) => {
+      const allCards = Object.values(cards).filter((c) => c.goalId === goal.id);
+      const rituals = allCards.filter((c) => c.ritual);
+      const stats = computeGoalStats(goal.id, ritualLog, cards);
+      return { goal, stats, cardCount: allCards.length, ritualCount: rituals.length };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goals, cardGoalKey, ritualLogLength]);
 
-  const compStats = computeStreaks(completionCounts, days);
-  const createStats = computeStreaks(creationCounts, days);
+  const pushBoardUpdate = (updatedGoals: Goal[], clearedGoalId?: string) => {
+    optimisticGoalsRef.current = updatedGoals;
+    // Build updated board: new goals + optionally clear goalId from related cards
+    let updatedCards = board.cards;
+    if (clearedGoalId) {
+      updatedCards = { ...board.cards };
+      for (const [id, card] of Object.entries(updatedCards)) {
+        if (card.goalId === clearedGoalId) {
+          updatedCards[id] = { ...card, goalId: undefined };
+        }
+      }
+    }
+    onUpdateBoard?.({ ...board, goals: updatedGoals, cards: updatedCards });
+  };
+
+  const handleAddGoal = (name: string, color: string, why?: string, deadline?: string) => {
+    const newGoal: Goal = {
+      id: crypto.randomUUID(), name, color, why, deadline,
+      createdAt: new Date().toISOString(),
+    };
+    pushBoardUpdate([...goals, newGoal]);
+    setAddingGoal(false);
+  };
+
+  const handleConfirmDeleteGoal = () => {
+    if (!deletingGoal) return;
+    const goalId = deletingGoal.id;
+    pushBoardUpdate(goals.filter((g) => g.id !== goalId), goalId);
+    setDeletingGoal(null);
+  };
 
   return (
     <div
@@ -460,129 +631,80 @@ export function ShadowBoardView({ board, onClose }: Props) {
         }}>
           Shadow Board
         </span>
-        {showDemo && (
-          <span style={{
-            marginLeft: "auto", fontSize: 10, color: theme.textTertiary,
-            fontWeight: 500, padding: "3px 8px", borderRadius: 5,
-            background: theme.surface,
-          }}>
-            Sample data
-          </span>
-        )}
       </div>
 
-      {/* 2x2 grid */}
-      <div style={{
-        flex: 1, display: "grid",
-        gridTemplateColumns: "3fr 2fr",
-        gridTemplateRows: "1fr 1fr",
-        gap: 14,
-        padding: "18px 36px 28px 36px",
-        minHeight: 0,
-      }}>
-        {/* Top-left: Completion heatmap */}
+      {/* Content — goals only */}
+      <div style={{ flex: 1, padding: "18px 36px 28px 36px", minHeight: 0, display: "flex", flexDirection: "column", gap: 14, overflow: "auto" }}>
+        {/* Goals section */}
         <div style={{
           padding: "16px 20px",
           borderRadius: 12,
           background: theme.surfaceFaint,
-          display: "flex", flexDirection: "column",
-          overflow: "hidden", minHeight: 0,
+          display: "flex", flexDirection: "column", gap: 10,
         }}>
           <div style={{
-            display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, flexShrink: 0,
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 2,
           }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#CD9B3C", opacity: 0.85 }}>
-              Tasks Completed
-            </span>
-            <span style={{ fontSize: 12, color: theme.textTertiary, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-              {periodCompletions.length} in {numWeeks}w
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
+              <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
+            </svg>
+            <span style={{ fontSize: 12, fontWeight: 700, color: theme.textTertiary, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+              Goals
             </span>
           </div>
-          <HeatmapGrid counts={completionCounts} days={days} color="#CD9B3C" theme={theme} />
-          <Indicators theme={theme} items={[
-            { value: compStats.streak, label: "streak" },
-            { value: compStats.bestStreak, label: "best" },
-            { value: compStats.activeDays, label: "active days" },
-            { value: compStats.maxDay, label: "max/day" },
-          ]} />
-        </div>
 
-        {/* Top-right: Completion daily plot */}
-        <div style={{
-          padding: "16px 20px",
-          borderRadius: 12,
-          background: theme.surfaceFaint,
-          display: "flex", flexDirection: "column",
-          minWidth: 0, minHeight: 0,
-        }}>
-          <div style={{
-            fontSize: 14, fontWeight: 700, color: "#CD9B3C",
-            marginBottom: 4, opacity: 0.85, flexShrink: 0,
-          }}>
-            Completed / Day
-          </div>
-          <DailyPlot
-            counts={completionCounts}
-            days={days}
-            color="#CD9B3C"
-            label="completed"
-            total={periodCompletions.length}
-            theme={theme}
-          />
-        </div>
+          {goalData.map(({ goal, stats, cardCount, ritualCount }) => (
+            <GoalCard
+              key={goal.id}
+              goal={goal}
+              stats={stats}
+              cardCount={cardCount}
+              ritualCount={ritualCount}
+              theme={theme}
+              onDelete={() => setDeletingGoal(goal)}
+            />
+          ))}
 
-        {/* Bottom-left: Creation heatmap */}
-        <div style={{
-          padding: "16px 20px",
-          borderRadius: 12,
-          background: theme.surfaceFaint,
-          display: "flex", flexDirection: "column",
-          overflow: "hidden", minHeight: 0,
-        }}>
-          <div style={{
-            display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, flexShrink: 0,
-          }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#6B8E6B", opacity: 0.85 }}>
-              Tasks Created
-            </span>
-            <span style={{ fontSize: 12, color: theme.textTertiary, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-              {periodCreations.length} in {numWeeks}w
-            </span>
-          </div>
-          <HeatmapGrid counts={creationCounts} days={days} color="#6B8E6B" theme={theme} />
-          <Indicators theme={theme} items={[
-            { value: createStats.activeDays, label: "active days" },
-            { value: createStats.maxDay, label: "max/day" },
-            { value: periodCreations.length > 0
-              ? (periodCreations.length / Math.max(createStats.activeDays, 1)).toFixed(1)
-              : "0", label: "avg/day" },
-          ]} />
-        </div>
+          {addingGoal && (
+            <AddGoalForm
+              theme={theme}
+              onAdd={handleAddGoal}
+              onCancel={() => setAddingGoal(false)}
+            />
+          )}
 
-        {/* Bottom-right: Creation daily plot */}
-        <div style={{
-          padding: "16px 20px",
-          borderRadius: 12,
-          background: theme.surfaceFaint,
-          display: "flex", flexDirection: "column",
-          minWidth: 0, minHeight: 0,
-        }}>
-          <div style={{
-            fontSize: 14, fontWeight: 700, color: "#6B8E6B",
-            marginBottom: 4, opacity: 0.85, flexShrink: 0,
-          }}>
-            Created / Day
-          </div>
-          <DailyPlot
-            counts={creationCounts}
-            days={days}
-            color="#6B8E6B"
-            label="created"
-            total={periodCreations.length}
-            theme={theme}
-          />
+          {!addingGoal && onUpdateBoard && (
+            <button
+              onClick={() => setAddingGoal(true)}
+              data-no-drag
+              style={{
+                padding: "8px 0", borderRadius: 8, fontSize: 13, fontWeight: 500,
+                background: "transparent", border: `1px dashed ${theme.border}`,
+                color: theme.textTertiary, cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              + Add goal
+            </button>
+          )}
         </div>
       </div>
+
+      {deletingGoal && (
+        <ConfirmDialog
+          title="Delete Goal"
+          message={`Delete "${deletingGoal.name}"? Cards assigned to this goal will be unlinked.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={handleConfirmDeleteGoal}
+          onClose={() => setDeletingGoal(null)}
+        />
+      )}
+
+      <style>{`
+        .goal-card:hover .goal-delete-btn { opacity: 1 !important; }
+        .goal-card:hover .goal-delete-btn:hover { color: rgba(220,80,80,0.7) !important; }
+      `}</style>
     </div>
   );
 }

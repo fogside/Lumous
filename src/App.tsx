@@ -3,6 +3,7 @@ import { DARK_INK } from "./lib/types";
 import { useBoards } from "./hooks/useBoards";
 import { useBoard } from "./hooks/useBoard";
 import { useSync } from "./hooks/useSync";
+import { saveBoard } from "./lib/storage";
 import { useWindowSize } from "./hooks/useWindowSize";
 import { Board } from "./lib/types";
 import { Sidebar } from "./components/Sidebar";
@@ -34,7 +35,7 @@ export default function App() {
     refreshBoard(board);
   }, [refreshBoard]);
 
-  const { board, moveCard, addCard, updateCard, deleteCard } = useBoard(activeBoard, handleBoardChanged);
+  const { board, moveCard, addCard, updateCard, deleteCard, setGoals } = useBoard(activeBoard, handleBoardChanged);
   const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings);
   const { mode } = useWindowSize();
 
@@ -97,6 +98,20 @@ export default function App() {
           <ShadowBoardView
             board={allBoards[shadowBoardId]}
             onClose={() => setShadowBoardId(null)}
+            onUpdateBoard={(updatedBoard: Board) => {
+              refreshBoard(updatedBoard);
+              saveBoard(updatedBoard).catch(console.error);
+              // Sync goals + cards back to active board reducer
+              if (shadowBoardId === activeBoardId) {
+                setGoals(updatedBoard.goals || []);
+                // Sync card changes (e.g., cleared goalId on goal deletion)
+                for (const [id, card] of Object.entries(updatedBoard.cards)) {
+                  if (board && board.cards[id] !== card) {
+                    updateCard(card);
+                  }
+                }
+              }
+            }}
           />
         ) : board ? (
           isCompact ? (
