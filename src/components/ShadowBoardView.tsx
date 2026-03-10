@@ -9,6 +9,130 @@ interface Props {
   onUpdateBoard?: (board: Board) => void;
 }
 
+// ─── Daily Haiku ───
+
+// Simple seeded PRNG for deterministic output per day
+function seededRandom(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+// Haiku templates — {word} gets replaced with a task-derived word
+// Each template: [line1 (5 syl), line2 (7 syl), line3 (5 syl)]
+const HAIKU_TEMPLATES = [
+  ["still water reflects", "each {word} becomes the path", "moon knows no hurry"],
+  ["the river flows on", "{word} like leaves on the stream", "nothing left undone"],
+  ["breath in, breath out, peace", "the {word} rests within your hands", "silence speaks the truth"],
+  ["one step, then the next", "{word} unfolds like morning light", "the way reveals way"],
+  ["wind moves through bamboo", "today you touched the {word}", "stars will hold the rest"],
+  ["empty cup fills up", "with {word} and quiet grace", "enough for today"],
+  ["clouds part, sun appears", "{word} was the bridge you crossed", "now rest, traveler"],
+  ["a stone finds the pond", "the {word} ripples outward still", "all circles return"],
+  ["moss grows on the wall", "you gave your hands to {word}", "that is everything"],
+  ["candle in the dark", "each small {word} lights the world", "be gentle with self"],
+  ["morning dew remains", "{word} carried through the hours", "evening bows to you"],
+  ["the oak does not rush", "yet {word} finds its completion", "trust the unfolding"],
+];
+
+// Fallback haiku when no tasks completed today
+const EMPTY_HAIKU = [
+  ["the day breathes in peace", "sometimes rest is the deepest", "work of body mind"],
+  ["no task is wasted", "even stillness has purpose", "the garden just grows"],
+  ["sometimes we must stop", "to hear the river singing", "beneath all the noise"],
+];
+
+function extractKeyWord(titles: string[], rand: () => number): string {
+  // Extract meaningful words from task titles (skip short/common ones)
+  const stopWords = new Set([
+    "the", "a", "an", "to", "for", "and", "or", "but", "in", "on", "at", "of",
+    "is", "it", "my", "do", "up", "so", "no", "if", "be", "we", "us", "by",
+    "with", "from", "this", "that", "all", "not", "was", "are", "has", "had",
+    "will", "can", "get", "got", "set", "out", "new", "old", "add", "fix",
+  ]);
+  const words = titles
+    .join(" ")
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, "")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !stopWords.has(w));
+
+  if (words.length === 0) return "work";
+  return words[Math.floor(rand() * words.length)];
+}
+
+function generateDailyHaiku(completedToday: string[]): string[] {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const seed = hashString(todayStr + completedToday.sort().join(","));
+  const rand = seededRandom(seed);
+
+  if (completedToday.length === 0) {
+    const idx = Math.floor(rand() * EMPTY_HAIKU.length);
+    return EMPTY_HAIKU[idx];
+  }
+
+  const keyword = extractKeyWord(completedToday, rand);
+  const idx = Math.floor(rand() * HAIKU_TEMPLATES.length);
+  const template = HAIKU_TEMPLATES[idx];
+  return template.map((line) => line.replace("{word}", keyword));
+}
+
+function DailyHaiku({ board, theme }: {
+  board: Board;
+  theme: ReturnType<typeof getBoardTheme>;
+}) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Find tasks completed today
+  const completedToday = useMemo(() => {
+    return Object.values(board.cards)
+      .filter((c) => c.completedAt && c.completedAt.slice(0, 10) === todayStr)
+      .map((c) => c.title);
+  }, [board.cards, todayStr]);
+
+  const lines = useMemo(
+    () => generateDailyHaiku(completedToday),
+    [completedToday],
+  );
+
+  return (
+    <div style={{
+      padding: "16px 20px",
+      borderRadius: 12,
+      background: theme.surfaceFaint,
+      textAlign: "center",
+    }}>
+      <div style={{
+        fontSize: 13, lineHeight: 2, color: theme.textSecondary,
+        fontStyle: "italic", fontWeight: 400,
+        letterSpacing: "0.02em",
+      }}>
+        {lines.map((line, i) => (
+          <div key={i}>{line}</div>
+        ))}
+      </div>
+      <div style={{
+        marginTop: 8, fontSize: 10, color: theme.textTertiary,
+        fontWeight: 600, letterSpacing: "0.08em",
+      }}>
+        {completedToday.length > 0
+          ? `${completedToday.length} task${completedToday.length !== 1 ? "s" : ""} completed today`
+          : "a quiet day"}
+      </div>
+    </div>
+  );
+}
+
 // ─── Tooltip ───
 
 function Tooltip({ x, y, children }: { x: number; y: number; children: React.ReactNode }) {
@@ -633,8 +757,11 @@ export function ShadowBoardView({ board, onClose, onUpdateBoard }: Props) {
         </span>
       </div>
 
-      {/* Content — goals only */}
+      {/* Content */}
       <div style={{ flex: 1, padding: "18px 36px 28px 36px", minHeight: 0, display: "flex", flexDirection: "column", gap: 14, overflow: "auto" }}>
+        {/* Daily haiku */}
+        <DailyHaiku board={board} theme={theme} />
+
         {/* Goals section */}
         <div style={{
           padding: "16px 20px",
