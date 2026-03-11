@@ -68,12 +68,20 @@ export function useSync(
     }
   }, [repoUrl, updateSettings, onSynced]);
 
-  // Auto-sync interval
+  // Auto-sync interval — visibility-aware to avoid firing immediately on wake
   useEffect(() => {
     clearInterval(intervalRef.current);
     if (!repoUrl || intervalMinutes <= 0) return;
 
+    // Track last sync time so we can skip stale interval fires on wake
+    let lastTick = Date.now();
+
     intervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - lastTick;
+      lastTick = Date.now();
+      // If elapsed time is much longer than the interval, the app was asleep.
+      // Skip this tick — the next one will fire normally.
+      if (elapsed > intervalMinutes * 60 * 1000 * 1.5) return;
       sync();
     }, intervalMinutes * 60 * 1000);
 

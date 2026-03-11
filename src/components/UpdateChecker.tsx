@@ -10,9 +10,9 @@ export function UpdateChecker() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
 
-  // Silent check on mount
+  // Silent check on mount — delayed to avoid competing with board loading
   useEffect(() => {
-    const timer = setTimeout(() => checkForUpdate(true), 2000);
+    const timer = setTimeout(() => checkForUpdate(true), 8000);
     return () => clearTimeout(timer);
   }, []);
 

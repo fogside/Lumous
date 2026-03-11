@@ -41,14 +41,25 @@ function computeGoalStats(
   goalId: string,
   ritualLog: RitualLogEntry[],
   cards: Record<string, Card>,
+  goalCreatedAt?: string,
   numPastDays: number = 90,
 ) {
   const ritualCards = Object.values(cards).filter((c) => c.goalId === goalId && c.ritual);
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
+
+  // Clamp to goal creation date — don't show days before the goal existed
+  const createdDate = goalCreatedAt ? goalCreatedAt.slice(0, 10) : null;
+  let effectiveDays = numPastDays;
+  if (createdDate) {
+    const createdMs = new Date(createdDate + "T12:00:00").getTime();
+    const daysSinceCreation = Math.ceil((today.getTime() - createdMs) / (1000 * 60 * 60 * 24)) + 1;
+    effectiveDays = Math.min(numPastDays, Math.max(1, daysSinceCreation));
+  }
+
   const days: GoalDayData[] = [];
 
-  for (let i = numPastDays - 1; i >= 0; i--) {
+  for (let i = effectiveDays - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().slice(0, 10);
@@ -266,6 +277,7 @@ function GoalCard({ goal, stats, cardCount, ritualCount, theme, onDelete }: {
         border: `1px solid ${theme.border}`,
         position: "relative",
         overflow: "hidden",
+        transition: "none",
       }}
     >
       {/* Glow */}
@@ -378,6 +390,174 @@ function GoalCard({ goal, stats, cardCount, ritualCount, theme, onDelete }: {
   );
 }
 
+// ─── Date Picker ───
+
+function DatePicker({ value, onChange, theme }: {
+  value: string; // YYYY-MM-DD or ""
+  onChange: (date: string) => void;
+  theme: ReturnType<typeof getBoardTheme>;
+}) {
+  const [open, setOpen] = useState(false);
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const selected = value || null;
+
+  // View month — start from selected date or today
+  const initial = selected ? new Date(selected + "T12:00:00") : today;
+  const [viewYear, setViewYear] = useState(initial.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initial.getMonth());
+
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  const prev = () => {
+    if (viewMonth === 0) { setViewYear(viewYear - 1); setViewMonth(11); }
+    else setViewMonth(viewMonth - 1);
+  };
+  const next = () => {
+    if (viewMonth === 11) { setViewYear(viewYear + 1); setViewMonth(0); }
+    else setViewMonth(viewMonth + 1);
+  };
+
+  const pick = (day: number) => {
+    const m = String(viewMonth + 1).padStart(2, "0");
+    const d = String(day).padStart(2, "0");
+    onChange(`${viewYear}-${m}-${d}`);
+    setOpen(false);
+  };
+
+  const displayLabel = selected
+    ? new Date(selected + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : "Pick a date";
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen(!open)}
+        data-no-drag
+        style={{
+          background: theme.surface, border: `1px solid ${theme.border}`,
+          borderRadius: 6, padding: "3px 10px",
+          fontSize: 12, fontWeight: 500,
+          color: selected ? theme.text : theme.textTertiary,
+          cursor: "pointer", whiteSpace: "nowrap",
+        }}
+      >
+        {displayLabel}
+      </button>
+
+      {open && (
+        <div
+          data-no-drag
+          style={{
+            position: "absolute", top: "100%", left: 0, marginTop: 4,
+            zIndex: 50, width: 240,
+            background: theme.isLight ? "rgba(255,255,255,0.95)" : "rgba(12,14,26,0.95)",
+            backdropFilter: "blur(16px)",
+            border: `1px solid ${theme.border}`,
+            borderRadius: 12, padding: "12px 14px",
+            boxShadow: "0 12px 32px rgba(0,0,0,0.4)",
+          }}
+        >
+          {/* Month/year nav */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <button onClick={prev} data-no-drag className="dp-nav" style={{
+              background: "transparent", border: "none", cursor: "pointer",
+              color: theme.textSecondary, fontSize: 14, padding: "2px 6px", borderRadius: 4,
+            }}>‹</button>
+            <span style={{ fontSize: 12, fontWeight: 700, color: theme.text }}>
+              {MONTHS[viewMonth]} {viewYear}
+            </span>
+            <button onClick={next} data-no-drag className="dp-nav" style={{
+              background: "transparent", border: "none", cursor: "pointer",
+              color: theme.textSecondary, fontSize: 14, padding: "2px 6px", borderRadius: 4,
+            }}>›</button>
+          </div>
+
+          {/* Day headers */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, marginBottom: 4 }}>
+            {DAYS.map((d) => (
+              <div key={d} style={{
+                fontSize: 9, fontWeight: 700, color: theme.textTertiary,
+                textAlign: "center", padding: "2px 0",
+                textTransform: "uppercase", letterSpacing: "0.05em",
+              }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Day grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1 }}>
+            {/* Empty cells for offset */}
+            {Array.from({ length: firstDay }, (_, i) => (
+              <div key={`e${i}`} />
+            ))}
+            {Array.from({ length: daysInMonth }, (_, i) => {
+              const day = i + 1;
+              const m = String(viewMonth + 1).padStart(2, "0");
+              const d = String(day).padStart(2, "0");
+              const dateStr = `${viewYear}-${m}-${d}`;
+              const isSelected = dateStr === selected;
+              const isToday = dateStr === todayStr;
+              const isPast = dateStr < todayStr;
+              return (
+                <button
+                  key={day}
+                  onClick={() => pick(day)}
+                  data-no-drag
+                  className="dp-day"
+                  style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 11, fontWeight: isSelected || isToday ? 700 : 500,
+                    background: isSelected ? theme.text : "transparent",
+                    color: isSelected
+                      ? (theme.isLight ? "white" : "#0a0e1a")
+                      : isPast
+                        ? theme.textTertiary
+                        : theme.text,
+                    border: isToday && !isSelected ? `1px solid ${theme.textTertiary}` : "none",
+                    cursor: "pointer", padding: 0,
+                    margin: "0 auto",
+                  }}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Today shortcut */}
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
+            <button
+              onClick={() => { onChange(todayStr); setOpen(false); }}
+              data-no-drag
+              className="dp-today-btn"
+              style={{
+                background: "transparent", border: "none",
+                color: theme.textTertiary, fontSize: 10, fontWeight: 600,
+                cursor: "pointer", padding: "2px 8px",
+                textTransform: "uppercase", letterSpacing: "0.08em",
+              }}
+            >
+              Today
+            </button>
+          </div>
+
+          <style>{`
+            .dp-day { transition: background 0.1s; }
+            .dp-day:hover { background: ${theme.surfaceHover} !important; }
+            .dp-nav:hover { background: ${theme.surface} !important; }
+            .dp-today-btn:hover { color: ${theme.text} !important; }
+          `}</style>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Add Goal form ───
 
 const GOAL_COLORS = CARD_LABELS.filter((l) => l.value).map((l) => l.color);
@@ -444,19 +624,7 @@ function AddGoalForm({ theme, onAdd, onCancel }: {
         <span style={{ fontSize: 11, fontWeight: 600, color: theme.textTertiary, whiteSpace: "nowrap" }}>
           Target date
         </span>
-        <input
-          type="date"
-          value={deadline}
-          onChange={(e) => setDeadline(e.target.value)}
-          data-no-drag
-          style={{
-            background: "transparent", border: `1px solid ${theme.border}`,
-            borderRadius: 6, padding: "3px 8px",
-            fontSize: 12, color: deadline ? theme.text : theme.textTertiary,
-            outline: "none", cursor: "pointer",
-            colorScheme: theme.isLight ? "light" : "dark",
-          }}
-        />
+        <DatePicker value={deadline} onChange={setDeadline} theme={theme} />
         {deadline && (
           <button
             onClick={() => setDeadline("")}
@@ -558,7 +726,7 @@ export function ShadowBoardView({ board, onClose, onUpdateBoard }: Props) {
     return goals.map((goal) => {
       const allCards = Object.values(cards).filter((c) => c.goalId === goal.id);
       const rituals = allCards.filter((c) => c.ritual);
-      const stats = computeGoalStats(goal.id, ritualLog, cards);
+      const stats = computeGoalStats(goal.id, ritualLog, cards, goal.createdAt);
       return { goal, stats, cardCount: allCards.length, ritualCount: rituals.length };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

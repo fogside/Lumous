@@ -259,6 +259,8 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
       </span>
 
       <style>{`
+        [data-card] { transition: background 0.15s; }
+        [data-card]:hover { background: ${theme.surfaceHover} !important; }
         [data-card] .card-label-btn { opacity: 0; }
         [data-card]:hover .card-label-btn { opacity: 0.5; }
         [data-card] .card-label-btn.has-label { opacity: 0.8; }

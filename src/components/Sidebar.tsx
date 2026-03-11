@@ -417,6 +417,8 @@ export function Sidebar({
         .board-row .board-row-actions { opacity: 0; transition: opacity 0.15s; }
         .board-row:hover .board-row-actions { opacity: 1; }
         .board-row .board-row-actions span:hover { color: rgba(255,255,255,0.7) !important; }
+        .board-row > div > button { transition: background 0.15s, color 0.15s; }
+        .board-row:hover > div > button { background: rgba(255,255,255,0.06) !important; color: rgba(255,255,255,0.65) !important; }
         .shadow-toggle .shadow-icon-default,
         .shadow-toggle .shadow-icon-hover { display: flex; align-items: center; justify-content: center; transition: opacity 0.15s; }
         .shadow-toggle .shadow-icon-hover { position: absolute; inset: 0; opacity: 0; }
