@@ -180,6 +180,23 @@ Deleting something substantial (boards, goals) must always show a `ConfirmDialog
 - **Never confirm**: card/task deletion (low cost, easily re-created)
 - Use `ConfirmDialog` component with `danger` prop for destructive actions
 
+## State Management: Preventing Infinite Loops
+
+The `useBoard` hook syncs board state between the reducer (local edits) and the parent (sidebar, shadow board). This creates a circular data flow that is easy to break:
+
+```
+useBoard reducer → onBoardChanged → refreshBoard → new initialBoard → SET_BOARD → reducer
+```
+
+**The rule**: `refreshBoard` always creates a **new object reference** (via spread). If the save effect triggers `onBoardChanged` on every board change — including those from `SET_BOARD` — the cycle never terminates.
+
+**The fix** (`suppressSaveRef`): When the `initialBoard` effect dispatches `SET_BOARD`, it sets `suppressSaveRef.current = true`. The save effect checks this flag and skips if set. User actions (ADD_CARD, MOVE_CARD, etc.) don't set this flag, so they still propagate normally.
+
+**When adding new effects or dispatches to `useBoard`:**
+- Never call `onBoardChanged` from effects triggered by `SET_BOARD` or `initialBoard` changes
+- If adding a new dispatch (like SPAWN_RITUALS), ensure it returns `state` (same reference) when there's nothing to change — otherwise it will trigger the save effect
+- The save effect's `board === lastSetBoardRef.current` check relies on reference equality; `suppressSaveRef` is the backup when that check fails due to React's effect ordering
+
 ## Checklist for New Components
 
 Before shipping any visual change:
@@ -193,3 +210,4 @@ Before shipping any visual change:
 7. Are all styles inline (no Tailwind classes)?
 8. Does it feel light and subtle, or heavy and corporate? If heavy, dial back.
 9. Do destructive actions on substantial items (boards, goals) show a confirmation dialog?
+10. Do new dispatches or effects in `useBoard` avoid triggering the save→refresh→SET_BOARD loop?

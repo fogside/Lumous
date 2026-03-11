@@ -147,6 +147,8 @@ export function useBoard(
   const boardRef = useRef<Board | null>(null);
   const prevBoardIdRef = useRef<string | null>(initialBoard?.id || null);
   const dirtyRef = useRef(false);
+  // Flag to suppress save effect when SET_BOARD was just dispatched from initialBoard
+  const suppressSaveRef = useRef(false);
 
   // Always keep ref in sync with latest reducer state
   boardRef.current = board;
@@ -167,6 +169,7 @@ export function useBoard(
     }
 
     if (initialBoard) {
+      suppressSaveRef.current = true;
       lastSetBoardRef.current = initialBoard;
       dispatch({ type: "SET_BOARD", board: initialBoard });
     }
@@ -180,6 +183,11 @@ export function useBoard(
     if (!board) return;
     // Skip when board was just set from initialBoard (external update, not user action)
     if (board === lastSetBoardRef.current) return;
+    // Skip if the initialBoard effect just fired in this render cycle
+    if (suppressSaveRef.current) {
+      suppressSaveRef.current = false;
+      return;
+    }
 
     dirtyRef.current = true;
 
