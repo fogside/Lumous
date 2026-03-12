@@ -1,8 +1,9 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Board, Goal, Card, RitualLogEntry, CARD_LABELS, getBoardTheme, isLightBoard } from "../lib/types";
+import { Board, Goal, Card, RitualLogEntry, CARD_LABELS, getBoardTheme, isLightBoard, BoardTheme } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { BackgroundWisps } from "./BackgroundWisps";
+import { useWindowSize } from "../hooks/useWindowSize";
 
 interface Props {
   board: Board;
@@ -686,6 +687,126 @@ function AddGoalForm({ theme, onAdd, onCancel }: {
 
 // ─── Main ───
 
+// ─── Completion Log ───
+
+function CompletionLog({ cards, theme }: { cards: Record<string, Card>; theme: BoardTheme }) {
+  // Group completed cards by date, most recent first
+  const dayGroups = useMemo(() => {
+    const completed = Object.values(cards).filter((c) => c.completedAt);
+    const groups: Record<string, { date: string; cards: Card[] }> = {};
+    for (const card of completed) {
+      const dateStr = card.completedAt!.slice(0, 10);
+      if (!groups[dateStr]) groups[dateStr] = { date: dateStr, cards: [] };
+      groups[dateStr].cards.push(card);
+    }
+    // Sort by date descending, limit to 30 days
+    return Object.values(groups)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 30);
+  }, [cards]);
+
+  if (dayGroups.length === 0) {
+    return (
+      <div style={{ padding: "24px 0", textAlign: "center" }}>
+        <span style={{ fontSize: 12, color: theme.textFaint, fontWeight: 500 }}>
+          No completed tasks yet
+        </span>
+      </div>
+    );
+  }
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr + "T12:00:00");
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    if (dateStr === todayStr) return "Today";
+    if (dateStr === yesterdayStr) return "Yesterday";
+    return d.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {dayGroups.map((group, gi) => (
+        <div key={group.date} style={{ display: "flex", gap: 0 }}>
+          {/* Tree trunk + branch */}
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            width: 24,
+            flexShrink: 0,
+          }}>
+            {/* Top connector */}
+            <div style={{
+              width: 1,
+              height: 8,
+              background: gi === 0 ? "transparent" : theme.border,
+            }} />
+            {/* Node dot */}
+            <div style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              border: `1.5px solid ${theme.textTertiary}`,
+              background: gi === 0 ? theme.textTertiary : "transparent",
+              flexShrink: 0,
+            }} />
+            {/* Bottom connector */}
+            <div style={{
+              width: 1,
+              flex: 1,
+              background: gi === dayGroups.length - 1 ? "transparent" : theme.border,
+            }} />
+          </div>
+
+          {/* Day content */}
+          <div style={{ flex: 1, paddingBottom: 16, minWidth: 0 }}>
+            <div style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: gi === 0 ? theme.textSecondary : theme.textTertiary,
+              marginBottom: 6,
+              marginTop: -1,
+            }}>
+              {formatDate(group.date)}
+            </div>
+            {group.cards.map((card) => (
+              <div key={card.id} style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 6,
+                marginBottom: 3,
+              }}>
+                <span style={{
+                  width: 3,
+                  height: 3,
+                  borderRadius: "50%",
+                  background: theme.textTertiary,
+                  flexShrink: 0,
+                  marginTop: 6,
+                  alignSelf: "flex-start",
+                }} />
+                <span style={{
+                  fontSize: 13,
+                  color: gi === 0 ? theme.text : theme.textSecondary,
+                  lineHeight: 1.5,
+                  opacity: gi === 0 ? 0.85 : 0.6,
+                }}>
+                  {card.title}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function startWindowDrag(e: React.MouseEvent) {
   if (e.button !== 0) return;
   const target = e.target as HTMLElement;
@@ -697,6 +818,8 @@ function startWindowDrag(e: React.MouseEvent) {
 
 export function ShadowBoardView({ board, onClose, onUpdateBoard, showWisps = true }: Props) {
   const theme = getBoardTheme(board.backgroundColor);
+  const { mode } = useWindowSize();
+  const isNarrow = mode !== "full"; // medium or compact
   const [addingGoal, setAddingGoal] = useState(false);
   const [deletingGoal, setDeletingGoal] = useState<Goal | null>(null);
 
@@ -782,8 +905,8 @@ export function ShadowBoardView({ board, onClose, onUpdateBoard, showWisps = tru
 
       {/* Header */}
       <div onMouseDown={startWindowDrag} style={{
-        padding: "36px 36px 0 36px",
-        display: "flex", alignItems: "center", gap: 12, flexShrink: 0,
+        padding: isNarrow ? "36px 16px 0 16px" : "36px 36px 0 36px",
+        display: "flex", alignItems: "center", gap: isNarrow ? 8 : 12, flexShrink: 0,
       }}>
         <button onClick={onClose} data-no-drag style={{
           width: 30, height: 30, borderRadius: 8,
@@ -795,71 +918,114 @@ export function ShadowBoardView({ board, onClose, onUpdateBoard, showWisps = tru
             <path d="M9 3L5 7L9 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: theme.text, margin: 0 }}>
+        <h1 style={{ fontSize: isNarrow ? 18 : 22, fontWeight: 700, color: theme.text, margin: 0 }}>
           {board.title}
         </h1>
-        <span style={{
-          fontSize: 11, fontWeight: 600, color: theme.textTertiary,
-          textTransform: "uppercase", letterSpacing: "0.1em",
-        }}>
-          Shadow Board
-        </span>
+        {!isNarrow && (
+          <span style={{
+            fontSize: 11, fontWeight: 600, color: theme.textTertiary,
+            textTransform: "uppercase", letterSpacing: "0.1em",
+          }}>
+            Shadow Board
+          </span>
+        )}
       </div>
 
-      {/* Content — goals only */}
-      <div style={{ flex: 1, padding: "18px 36px 28px 36px", minHeight: 0, display: "flex", flexDirection: "column", gap: 14, overflow: "auto" }}>
-        {/* Goals section */}
+      {/* Content — goals + completion log side by side (or stacked when narrow) */}
+      <div style={{
+        flex: 1,
+        padding: isNarrow ? "8px 10px 14px 10px" : "18px 36px 28px 36px",
+        minHeight: 0,
+        display: "flex",
+        flexDirection: isNarrow ? "column" : "row",
+        gap: isNarrow ? 8 : 20,
+        overflow: isNarrow ? "auto" : "hidden",
+      }}>
+        {/* Completion log — 1/3 (or on top when narrow) */}
         <div style={{
-          padding: "16px 20px",
-          borderRadius: 12,
-          background: theme.surfaceFaint,
-          display: "flex", flexDirection: "column", gap: 10,
+          flex: isNarrow ? "none" : 1,
+          minHeight: 0,
+          overflowY: isNarrow ? "visible" : "auto",
+          order: isNarrow ? -1 : 1,
         }}>
           <div style={{
-            display: "flex", alignItems: "center", gap: 8, marginBottom: 2,
+            padding: isNarrow ? "10px 12px" : "16px 20px",
+            borderRadius: isNarrow ? 10 : 12,
+            background: theme.surfaceFaint,
           }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
-              <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
-            </svg>
-            <span style={{ fontSize: 12, fontWeight: 700, color: theme.textTertiary, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-              Goals
-            </span>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8, marginBottom: isNarrow ? 8 : 12,
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
+                <path d="M12 8v4l3 3" /><circle cx="12" cy="12" r="10" />
+              </svg>
+              <span style={{ fontSize: 12, fontWeight: 700, color: theme.textTertiary, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                Done
+              </span>
+            </div>
+            <CompletionLog cards={board.cards} theme={theme} />
           </div>
+        </div>
 
-          {goalData.map(({ goal, stats, cardCount, ritualCount }) => (
-            <GoalCard
-              key={goal.id}
-              goal={goal}
-              stats={stats}
-              cardCount={cardCount}
-              ritualCount={ritualCount}
-              theme={theme}
-              onDelete={() => setDeletingGoal(goal)}
-            />
-          ))}
+        {/* Goals section — 2/3 (or below when narrow) */}
+        <div style={{
+          flex: isNarrow ? "none" : 2,
+          minHeight: 0,
+          overflowY: isNarrow ? "visible" : "auto",
+          order: isNarrow ? 0 : 0,
+        }}>
+          <div style={{
+            padding: isNarrow ? "10px 12px" : "16px 20px",
+            borderRadius: isNarrow ? 10 : 12,
+            background: theme.surfaceFaint,
+            display: "flex", flexDirection: "column", gap: isNarrow ? 8 : 10,
+          }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8, marginBottom: 2,
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
+                <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
+              </svg>
+              <span style={{ fontSize: 12, fontWeight: 700, color: theme.textTertiary, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                Goals
+              </span>
+            </div>
 
-          {addingGoal && (
-            <AddGoalForm
-              theme={theme}
-              onAdd={handleAddGoal}
-              onCancel={() => setAddingGoal(false)}
-            />
-          )}
+            {goalData.map(({ goal, stats, cardCount, ritualCount }) => (
+              <GoalCard
+                key={goal.id}
+                goal={goal}
+                stats={stats}
+                cardCount={cardCount}
+                ritualCount={ritualCount}
+                theme={theme}
+                onDelete={() => setDeletingGoal(goal)}
+              />
+            ))}
 
-          {!addingGoal && onUpdateBoard && (
-            <button
-              onClick={() => setAddingGoal(true)}
-              data-no-drag
-              style={{
-                padding: "8px 0", borderRadius: 8, fontSize: 13, fontWeight: 500,
-                background: "transparent", border: `1px dashed ${theme.border}`,
-                color: theme.textTertiary, cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-            >
-              + Add goal
-            </button>
-          )}
+            {addingGoal && (
+              <AddGoalForm
+                theme={theme}
+                onAdd={handleAddGoal}
+                onCancel={() => setAddingGoal(false)}
+              />
+            )}
+
+            {!addingGoal && onUpdateBoard && (
+              <button
+                onClick={() => setAddingGoal(true)}
+                data-no-drag
+                style={{
+                  padding: "8px 0", borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  background: "transparent", border: `1px dashed ${theme.border}`,
+                  color: theme.textTertiary, cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                + Add goal
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

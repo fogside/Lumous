@@ -58,14 +58,37 @@ Use semantic versioning:
 - **Minor** (1.2.x → 1.3.0): new features, UI additions
 - **Major** (1.x → 2.0.0): breaking changes, major redesigns
 
-Commit the version bump:
+## Step 2: Update RELEASES.md
+
+Prepend a new section to the top of `RELEASES.md` (right after the `# Releases` heading) with the changelog for this version. Follow the existing format:
+
+```markdown
+## vX.Y.Z — Short Title
+
+*YYYY-MM-DD*
+
+- **Feature name** — brief description
+- **Another change** — brief description
+
+### Install
+
+\`\`\`bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+\`\`\`
+
+---
+```
+
+Summarize all changes since the last release by reviewing the git log. Each bullet should have a bold label and a short explanation. Keep it concise.
+
+Commit the version bump and changelog together:
 ```bash
-git add package.json src-tauri/tauri.conf.json
+git add package.json src-tauri/tauri.conf.json RELEASES.md
 git commit -m "Bump version to X.Y.Z"
 git push
 ```
 
-## Step 2: Build with signing
+## Step 3: Build with signing
 
 ```bash
 export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/WandDo.key)"
@@ -84,7 +107,7 @@ src-tauri/target/release/bundle/
 
 If you see the error `A public key has been found, but no private key`, the signing key is missing. Stop and set `TAURI_SIGNING_PRIVATE_KEY` before retrying.
 
-## Step 3: Generate `latest.json`
+## Step 4: Generate `latest.json`
 
 Tauri does not auto-generate `latest.json` as a file on disk. Create it manually from the build outputs:
 
@@ -110,7 +133,7 @@ EOF
 
 Fill in the `"notes"` field with a brief one-liner describing the release. This text may be shown in the updater dialog.
 
-## Step 4: Create the GitHub release
+## Step 5: Create the GitHub release
 
 Tag, push, and create the release with the two artifacts (no DMG):
 
@@ -138,7 +161,7 @@ EOF
 )"
 ```
 
-## Step 5: Verify
+## Step 6: Verify
 
 Confirm both artifacts are present:
 
@@ -166,6 +189,7 @@ curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.t
 ## Checklist
 
 - [ ] Version bumped in `package.json` and `tauri.conf.json`
+- [ ] `RELEASES.md` updated with changelog for this version
 - [ ] `TAURI_SIGNING_PRIVATE_KEY` set from `~/.tauri/WandDo.key`
 - [ ] `npm run tauri build` completed with "Finished 1 updater signature"
 - [ ] `latest.json` generated with correct version, signature, and pub_date

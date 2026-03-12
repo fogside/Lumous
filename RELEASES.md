@@ -1,5 +1,40 @@
 # Releases
 
+## v1.6.0 — Completion Log & Shadow Board Polish
+
+*2026-03-12*
+
+- **Completion log** — shadow board now shows a daily log of completed tasks in a tree-branch timeline, grouped by date with Today/Yesterday labels
+- **Goal dot on cards** — task cards show a small colored dot matching their assigned goal
+- **Wisps on shadow board** — background wisps now render on the shadow board view too
+- **Persistent wisps toggle** — sparkle toggle stays visible in the same position across board and shadow board views
+- **Responsive shadow board** — at narrow widths, the layout stacks vertically with "Done" log on top and tighter margins
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
+## v1.5.0 — Custom Date Picker & Hover Effects
+
+*2026-03-11*
+
+- **Custom themed date picker** for goal deadlines (replaces native calendar)
+- **Hover effects** on sidebar board list and task cards
+- **Wake-up fix** — app no longer unresponsive after waking from sleep
+- **New goals** no longer show empty past streak bubbles
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v1.3.0 — Ambient Wisps & UI Polish
 
 *2026-03-10*
