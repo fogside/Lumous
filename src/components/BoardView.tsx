@@ -17,7 +17,6 @@ import { CardModal } from "./CardModal";
 import { SparkleEffect, SparkleEvent } from "./SparkleEffect";
 import { WizardCelebration } from "./WizardCelebration";
 import { BackgroundWisps } from "./BackgroundWisps";
-import { Sparkles } from "lucide-react";
 import type { ViewMode } from "../hooks/useWindowSize";
 
 interface Props {
@@ -29,7 +28,6 @@ interface Props {
   onTitleChange?: (title: string) => void;
   mode?: ViewMode;
   showWisps?: boolean;
-  onToggleWisps?: () => void;
 }
 
 function EditableTitle({ title, onSave, small, theme }: { title: string; onSave: (t: string) => void; small?: boolean; theme: BoardTheme }) {
@@ -112,7 +110,7 @@ function startWindowDrag(e: React.MouseEvent) {
   getCurrentWindow().startDragging();
 }
 
-export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, onTitleChange, mode = "full", showWisps = true, onToggleWisps }: Props) {
+export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, onTitleChange, mode = "full", showWisps = true }: Props) {
   const [editingCard, setEditingCard] = useState<{ card: CardType; columnId: string } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeRect, setActiveRect] = useState<{ width: number; height: number } | null>(null);
@@ -244,35 +242,6 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
     >
       <BackgroundWisps boardColor={board.backgroundColor} isLight={theme.isLight} visible={showWisps} />
 
-      {/* Wisps toggle — top right corner, always visible */}
-      {!theme.isLight && onToggleWisps && (
-        <button
-          onClick={onToggleWisps}
-          title={showWisps ? "Hide wisps" : "Show wisps"}
-          data-no-drag
-          style={{
-            position: "absolute",
-            top: 12,
-            right: 14,
-            zIndex: 2,
-            width: 22,
-            height: 22,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            color: showWisps ? theme.textSecondary : theme.textTertiary,
-            opacity: showWisps ? 0.8 : 0.5,
-            transition: "all 0.3s",
-            padding: 0,
-          }}
-        >
-          <Sparkles size={14} strokeWidth={1.5} />
-        </button>
-      )}
-
       {/* Board header */}
       <div onMouseDown={startWindowDrag} style={{ padding: headerPad }}>
         <EditableTitle
@@ -362,6 +331,7 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
                   onLabelChange={handleLabelChange}
                   boardColor={board.backgroundColor}
                   theme={theme}
+                  goals={board.goals}
                 />
               );
             })}

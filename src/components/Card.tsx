@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Card as CardType, CardLabel, CARD_LABELS, BoardTheme } from "../lib/types";
+import { Card as CardType, CardLabel, CARD_LABELS, BoardTheme, Goal } from "../lib/types";
 
 interface Props {
   card: CardType;
@@ -13,6 +13,7 @@ interface Props {
   boardColor?: string;
   theme: BoardTheme;
   solo?: boolean;
+  goals?: Goal[];
 }
 
 function LabelPicker({ anchor, current, boardColor, theme, onChange, onClose }: { anchor: DOMRect; current: CardLabel | undefined; boardColor?: string; theme: BoardTheme; onChange: (l: CardLabel) => void; onClose: () => void }) {
@@ -82,7 +83,7 @@ function LabelPicker({ anchor, current, boardColor, theme, onChange, onClose }: 
   );
 }
 
-export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, solo }: Props) {
+export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, solo, goals }: Props) {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -96,6 +97,7 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
   } = useSortable({ id: card.id });
 
   const labelColor = CARD_LABELS.find((l) => l.value === card.label)?.color;
+  const goalColor = card.goalId && goals ? goals.find((g) => g.id === card.goalId)?.color : undefined;
 
   return (
     <div
@@ -246,6 +248,16 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
         </p>
       )}
       <span style={{ fontSize: 11, color: theme.textTertiary, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontWeight: 400 }}>
+        {goalColor && (
+          <span style={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            background: goalColor,
+            flexShrink: 0,
+            opacity: 0.85,
+          }} />
+        )}
         {card.ritual && (
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, flexShrink: 0 }}>
             <path d="M17 2l4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" />

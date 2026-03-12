@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import { DARK_INK } from "./lib/types";
+import { DARK_INK, isLightBoard, getBoardTheme } from "./lib/types";
+import { Sparkles } from "lucide-react";
 import { useBoards } from "./hooks/useBoards";
 import { useBoard } from "./hooks/useBoard";
 import { useSync } from "./hooks/useSync";
@@ -93,7 +94,7 @@ export default function App() {
         />
       )}
 
-      <main style={{ flex: 1, overflow: "hidden" }}>
+      <main style={{ flex: 1, overflow: "hidden", position: "relative" }}>
         {shadowBoardId && allBoards[shadowBoardId] ? (
           <ShadowBoardView
             board={allBoards[shadowBoardId]}
@@ -112,6 +113,7 @@ export default function App() {
                 }
               }
             }}
+            showWisps={showWisps}
           />
         ) : board ? (
           isCompact ? (
@@ -135,7 +137,6 @@ export default function App() {
               }}
               mode={mode}
               showWisps={showWisps}
-              onToggleWisps={() => setShowWisps(!showWisps)}
             />
           )
         ) : (
@@ -143,6 +144,42 @@ export default function App() {
             <p style={{ color: "rgba(255,255,255,0.15)", fontSize: 13, fontWeight: 500 }}>No board selected</p>
           </div>
         )}
+
+        {/* Wisps toggle — always top-right of content area */}
+        {(() => {
+          const visibleBoard = shadowBoardId && allBoards[shadowBoardId]
+            ? allBoards[shadowBoardId]
+            : board && activeBoardId ? (allBoards[activeBoardId] || board) : null;
+          if (!visibleBoard || isLightBoard(visibleBoard.backgroundColor)) return null;
+          const t = getBoardTheme(visibleBoard.backgroundColor);
+          return (
+            <button
+              onClick={() => setShowWisps(!showWisps)}
+              title={showWisps ? "Hide wisps" : "Show wisps"}
+              data-no-drag
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 14,
+                zIndex: 2,
+                width: 22,
+                height: 22,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: showWisps ? t.textSecondary : t.textTertiary,
+                opacity: showWisps ? 0.8 : 0.5,
+                transition: "all 0.3s",
+                padding: 0,
+              }}
+            >
+              <Sparkles size={14} strokeWidth={1.5} />
+            </button>
+          );
+        })()}
       </main>
 
       {editingBoard && (

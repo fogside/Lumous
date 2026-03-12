@@ -1,12 +1,14 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Board, Goal, Card, RitualLogEntry, CARD_LABELS, getBoardTheme } from "../lib/types";
+import { Board, Goal, Card, RitualLogEntry, CARD_LABELS, getBoardTheme, isLightBoard } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { BackgroundWisps } from "./BackgroundWisps";
 
 interface Props {
   board: Board;
   onClose: () => void;
   onUpdateBoard?: (board: Board) => void;
+  showWisps?: boolean;
 }
 
 // ─── Tooltip ───
@@ -693,7 +695,7 @@ function startWindowDrag(e: React.MouseEvent) {
   getCurrentWindow().startDragging();
 }
 
-export function ShadowBoardView({ board, onClose, onUpdateBoard }: Props) {
+export function ShadowBoardView({ board, onClose, onUpdateBoard, showWisps = true }: Props) {
   const theme = getBoardTheme(board.backgroundColor);
   const [addingGoal, setAddingGoal] = useState(false);
   const [deletingGoal, setDeletingGoal] = useState<Goal | null>(null);
@@ -773,8 +775,11 @@ export function ShadowBoardView({ board, onClose, onUpdateBoard }: Props) {
         height: "100%",
         backgroundColor: board.backgroundColor,
         overflow: "hidden",
+        position: "relative",
       }}
     >
+      <BackgroundWisps boardColor={board.backgroundColor} isLight={isLightBoard(board.backgroundColor)} visible={showWisps} />
+
       {/* Header */}
       <div onMouseDown={startWindowDrag} style={{
         padding: "36px 36px 0 36px",

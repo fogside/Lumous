@@ -1,6 +1,6 @@
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { Column as ColumnType, Card as CardType, CardLabel, BoardTheme } from "../lib/types";
+import { Column as ColumnType, Card as CardType, CardLabel, BoardTheme, Goal } from "../lib/types";
 import { Card } from "./Card";
 import { NewCardInput } from "./NewCardInput";
 
@@ -13,9 +13,10 @@ interface Props {
   solo?: boolean;
   boardColor?: string;
   theme: BoardTheme;
+  goals?: Goal[];
 }
 
-export function Column({ column, cards, onAddCard, onCardClick, onLabelChange, solo, boardColor, theme }: Props) {
+export function Column({ column, cards, onAddCard, onCardClick, onLabelChange, solo, boardColor, theme, goals }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const isCompleted = column.id === "completed";
   const shrink = isCompleted && !solo;
@@ -80,6 +81,7 @@ export function Column({ column, cards, onAddCard, onCardClick, onLabelChange, s
               boardColor={boardColor}
               theme={theme}
               solo={solo}
+              goals={goals}
             />
           ))}
 
