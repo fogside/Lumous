@@ -154,6 +154,7 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
 
       {/* Crescent label button */}
       <button
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
           if (!showPicker && cardRef.current) {
