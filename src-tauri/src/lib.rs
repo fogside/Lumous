@@ -101,6 +101,38 @@ fn git_run(app: tauri::AppHandle, args: Vec<String>) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn run_claude(system_prompt: String, user_prompt: String) -> Result<String, String> {
+    let output = Command::new("claude")
+        .arg("-p")
+        .arg(&user_prompt)
+        .arg("--system-prompt")
+        .arg(&system_prompt)
+        .arg("--output-format")
+        .arg("text")
+        .arg("--model")
+        .arg("claude-opus-4-6")
+        .output()
+        .map_err(|e| format!("Failed to run claude: {}. Is Claude Code installed?", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        return Err(format!("Claude CLI error: {}", stderr));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+fn get_board_mtime(app: tauri::AppHandle, id: String) -> Result<u64, String> {
+    let path = get_data_path(&app).join("boards").join(format!("{}.json", id));
+    let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
+    let modified = metadata.modified().map_err(|e| e.to_string())?;
+    Ok(modified
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64)
+}
+
+#[tauri::command]
 fn check_online() -> bool {
     Command::new("curl")
         .args(["--silent", "--head", "--max-time", "3", "https://github.com"])
@@ -155,6 +187,8 @@ pub fn run() {
             save_board,
             delete_board_file,
             get_data_dir,
+            get_board_mtime,
+            run_claude,
             git_run,
             check_online,
         ])

@@ -14,9 +14,11 @@ interface Props {
   boardColor?: string;
   theme: BoardTheme;
   goals?: Goal[];
+  onAcceptProposal?: (cardId: string) => void;
+  onRejectProposal?: (cardId: string) => void;
 }
 
-export function Column({ column, cards, onAddCard, onCardClick, onLabelChange, solo, boardColor, theme, goals }: Props) {
+export function Column({ column, cards, onAddCard, onCardClick, onLabelChange, solo, boardColor, theme, goals, onAcceptProposal, onRejectProposal }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const isCompleted = column.id === "completed";
   const shrink = isCompleted && !solo;
@@ -82,6 +84,8 @@ export function Column({ column, cards, onAddCard, onCardClick, onLabelChange, s
               theme={theme}
               solo={solo}
               goals={goals}
+              onAcceptProposal={onAcceptProposal}
+              onRejectProposal={onRejectProposal}
             />
           ))}
 

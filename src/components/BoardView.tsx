@@ -28,6 +28,12 @@ interface Props {
   onTitleChange?: (title: string) => void;
   mode?: ViewMode;
   showWisps?: boolean;
+  acceptProposal?: (cardId: string) => void;
+  rejectProposal?: (cardId: string) => void;
+  acceptAllProposals?: () => void;
+  rejectAllProposals?: () => void;
+  clearHighlights?: () => void;
+  onOpenMagician?: () => void;
 }
 
 function EditableTitle({ title, onSave, small, theme }: { title: string; onSave: (t: string) => void; small?: boolean; theme: BoardTheme }) {
@@ -110,7 +116,7 @@ function startWindowDrag(e: React.MouseEvent) {
   getCurrentWindow().startDragging();
 }
 
-export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, onTitleChange, mode = "full", showWisps = true }: Props) {
+export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, onTitleChange, mode = "full", showWisps = true, acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights, onOpenMagician }: Props) {
   const [editingCard, setEditingCard] = useState<{ card: CardType; columnId: string } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeRect, setActiveRect] = useState<{ width: number; height: number } | null>(null);
@@ -121,6 +127,10 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
   const [selectedTab, setSelectedTab] = useState("today");
 
   const theme = getBoardTheme(board.backgroundColor);
+
+  const proposalCount = Object.values(board.cards).filter((c) => c.proposed).length;
+  const highlightCount = Object.values(board.cards).filter((c) => c.highlighted).length;
+  const hasWizardSuggestions = proposalCount > 0 || highlightCount > 0;
 
   const handleLabelChange = useCallback((cardId: string, label: CardLabel) => {
     const card = board.cards[cardId];
@@ -243,14 +253,124 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
       <BackgroundWisps boardColor={board.backgroundColor} isLight={theme.isLight} visible={showWisps} />
 
       {/* Board header */}
-      <div onMouseDown={startWindowDrag} style={{ padding: headerPad }}>
+      <div onMouseDown={startWindowDrag} style={{ padding: headerPad, display: "flex", alignItems: "center", gap: 10 }}>
         <EditableTitle
           title={board.title}
           onSave={(t) => onTitleChange?.(t)}
           small={isMedium}
           theme={theme}
         />
+        {onOpenMagician && (
+          <button
+            onClick={onOpenMagician}
+            data-no-drag
+            title="Ask the Wizard"
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              border: "none",
+              background: "transparent",
+              color: theme.textTertiary,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.15s",
+              flexShrink: 0,
+              opacity: 0.6,
+            }}
+            className="wand-btn"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" />
+              <path d="M17.8 11.8L19 13" /><path d="M15 9h.01" />
+              <path d="M17.8 6.2L19 5" /><path d="M3 21l9-9" />
+              <path d="M12.2 6.2L11 5" />
+            </svg>
+          </button>
+        )}
       </div>
+
+      {/* Wizard suggestion bar */}
+      {hasWizardSuggestions && (
+        <div
+          data-no-drag
+          style={{
+            margin: isMedium ? "0 12px 8px 12px" : "0 20px 12px 20px",
+            padding: "10px 16px",
+            borderRadius: 12,
+            background: "rgba(180,138,192,0.08)",
+            border: "1px solid rgba(180,138,192,0.15)",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 16 }}>{"🧙"}</span>
+          <span style={{ fontSize: 13, color: theme.text, fontWeight: 500, flex: 1 }}>
+            {proposalCount > 0 && `${proposalCount} suggestion${proposalCount > 1 ? "s" : ""}`}
+            {proposalCount > 0 && highlightCount > 0 && " · "}
+            {highlightCount > 0 && `${highlightCount} highlighted`}
+          </span>
+          <div style={{ display: "flex", gap: 6 }}>
+            {proposalCount > 0 && (
+              <>
+                <button
+                  onClick={acceptAllProposals}
+                  style={{
+                    padding: "5px 12px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "rgba(100,200,100,0.9)",
+                    background: "rgba(100,200,100,0.1)",
+                    border: "1px solid rgba(100,200,100,0.2)",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  Accept all
+                </button>
+                <button
+                  onClick={rejectAllProposals}
+                  style={{
+                    padding: "5px 12px",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: theme.textSecondary,
+                    background: "transparent",
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  Dismiss all
+                </button>
+              </>
+            )}
+            {highlightCount > 0 && proposalCount === 0 && (
+              <button
+                onClick={clearHighlights}
+                style={{
+                  padding: "5px 12px",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: theme.textSecondary,
+                  background: "transparent",
+                  border: `1px solid ${theme.border}`,
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                Clear highlights
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tab bar for medium mode */}
       {isMedium && (
@@ -332,6 +452,8 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
                   boardColor={board.backgroundColor}
                   theme={theme}
                   goals={board.goals}
+                  onAcceptProposal={acceptProposal}
+                  onRejectProposal={rejectProposal}
                 />
               );
             })}

@@ -14,6 +14,7 @@ import { ShadowBoardView } from "./components/ShadowBoardView";
 import { BoardSettingsModal } from "./components/BoardSettingsModal";
 import { NewBoardModal } from "./components/NewBoardModal";
 import { SyncSettingsModal } from "./components/SyncSettingsModal";
+import { MagicianModal } from "./components/MagicianModal";
 
 export default function App() {
   const {
@@ -36,7 +37,10 @@ export default function App() {
     refreshBoard(board);
   }, [refreshBoard]);
 
-  const { board, moveCard, addCard, updateCard, deleteCard, setGoals } = useBoard(activeBoard, handleBoardChanged);
+  const {
+    board, moveCard, addCard, updateCard, deleteCard, setGoals,
+    acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
+  } = useBoard(activeBoard, handleBoardChanged);
   const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings);
   const { mode } = useWindowSize();
 
@@ -46,6 +50,7 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [shadowBoardId, setShadowBoardId] = useState<string | null>(null);
   const [showWisps, setShowWisps] = useState(true);
+  const [showMagician, setShowMagician] = useState(false);
 
   if (loading) {
     return (
@@ -137,6 +142,12 @@ export default function App() {
               }}
               mode={mode}
               showWisps={showWisps}
+              acceptProposal={acceptProposal}
+              rejectProposal={rejectProposal}
+              acceptAllProposals={acceptAllProposals}
+              rejectAllProposals={rejectAllProposals}
+              clearHighlights={clearHighlights}
+              onOpenMagician={() => setShowMagician(true)}
             />
           )
         ) : (
@@ -205,6 +216,14 @@ export default function App() {
           settings={meta.settings}
           onSave={updateSettings}
           onClose={() => setShowSyncSettings(false)}
+        />
+      )}
+
+      {showMagician && board && (
+        <MagicianModal
+          board={activeBoardId ? allBoards[activeBoardId] || board : board}
+          theme={getBoardTheme((activeBoardId ? allBoards[activeBoardId] || board : board).backgroundColor)}
+          onClose={() => setShowMagician(false)}
         />
       )}
     </div>

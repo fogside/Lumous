@@ -1,6 +1,6 @@
 import { useReducer, useCallback, useEffect, useRef } from "react";
 import { Board, Card, Goal, createCard } from "../lib/types";
-import { saveBoard } from "../lib/storage";
+import { saveBoard, loadBoard, getBoardMtime } from "../lib/storage";
 
 type Action =
   | { type: "SET_BOARD"; board: Board }
@@ -9,7 +9,12 @@ type Action =
   | { type: "UPDATE_CARD"; card: Card }
   | { type: "DELETE_CARD"; cardId: string; columnId: string }
   | { type: "SPAWN_RITUALS" }
-  | { type: "SET_GOALS"; goals: Goal[] };
+  | { type: "SET_GOALS"; goals: Goal[] }
+  | { type: "ACCEPT_PROPOSAL"; cardId: string }
+  | { type: "REJECT_PROPOSAL"; cardId: string }
+  | { type: "ACCEPT_ALL_PROPOSALS" }
+  | { type: "REJECT_ALL_PROPOSALS" }
+  | { type: "CLEAR_HIGHLIGHTS" };
 
 function boardReducer(state: Board | null, action: Action): Board | null {
   if (action.type === "SET_BOARD") return action.board;
@@ -133,6 +138,65 @@ function boardReducer(state: Board | null, action: Action): Board | null {
       return { ...state, goals: action.goals };
     }
 
+    case "ACCEPT_PROPOSAL": {
+      const card = state.cards[action.cardId];
+      if (!card?.proposed) return state;
+      const { proposed: _, proposedReasoning: __, ...rest } = card;
+      return { ...state, cards: { ...state.cards, [action.cardId]: rest as Card } };
+    }
+
+    case "REJECT_PROPOSAL": {
+      const card = state.cards[action.cardId];
+      if (!card?.proposed) return state;
+      const cards = { ...state.cards };
+      delete cards[action.cardId];
+      const columns = state.columns.map((col) => ({
+        ...col,
+        cardIds: col.cardIds.filter((id) => id !== action.cardId),
+      }));
+      return { ...state, cards, columns };
+    }
+
+    case "ACCEPT_ALL_PROPOSALS": {
+      const cards: Record<string, Card> = {};
+      for (const [id, card] of Object.entries(state.cards)) {
+        if (card.proposed) {
+          const { proposed: _, proposedReasoning: __, ...rest } = card;
+          cards[id] = rest as Card;
+        } else {
+          cards[id] = card;
+        }
+      }
+      return { ...state, cards };
+    }
+
+    case "REJECT_ALL_PROPOSALS": {
+      const proposedIds = new Set(
+        Object.entries(state.cards).filter(([, c]) => c.proposed).map(([id]) => id)
+      );
+      if (proposedIds.size === 0) return state;
+      const cards = { ...state.cards };
+      for (const id of proposedIds) delete cards[id];
+      const columns = state.columns.map((col) => ({
+        ...col,
+        cardIds: col.cardIds.filter((id) => !proposedIds.has(id)),
+      }));
+      return { ...state, cards, columns };
+    }
+
+    case "CLEAR_HIGHLIGHTS": {
+      const cards: Record<string, Card> = {};
+      for (const [id, card] of Object.entries(state.cards)) {
+        if (card.highlighted) {
+          const { highlighted: _, highlightReason: __, ...rest } = card;
+          cards[id] = rest as Card;
+        } else {
+          cards[id] = card;
+        }
+      }
+      return { ...state, cards };
+    }
+
     default:
       return state;
   }
@@ -224,6 +288,30 @@ export function useBoard(
     return () => clearInterval(interval);
   }, []);
 
+  // Poll for external file changes (e.g., MCP server writing proposed cards)
+  const lastMtimeRef = useRef<number>(0);
+  useEffect(() => {
+    const boardId = initialBoard?.id;
+    if (!boardId) return;
+    // Initialize mtime
+    getBoardMtime(boardId).then((mt) => { lastMtimeRef.current = mt; }).catch(() => {});
+    const interval = setInterval(async () => {
+      if (dirtyRef.current) return; // don't reload while user has unsaved changes
+      try {
+        const mt = await getBoardMtime(boardId);
+        if (mt > lastMtimeRef.current && lastMtimeRef.current > 0) {
+          lastMtimeRef.current = mt;
+          const fresh = await loadBoard(boardId);
+          suppressSaveRef.current = true;
+          lastSetBoardRef.current = fresh;
+          dispatch({ type: "SET_BOARD", board: fresh });
+          onBoardChanged?.(fresh);
+        }
+      } catch { /* file may not exist yet */ }
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [initialBoard?.id, onBoardChanged]);
+
   const moveCard = useCallback(
     (cardId: string, fromCol: string, toCol: string, toIndex: number) => {
       dispatch({ type: "MOVE_CARD", cardId, fromCol, toCol, toIndex });
@@ -247,5 +335,28 @@ export function useBoard(
     dispatch({ type: "SET_GOALS", goals });
   }, []);
 
-  return { board, dispatch, moveCard, addCard, updateCard, deleteCard, setGoals };
+  const acceptProposal = useCallback((cardId: string) => {
+    dispatch({ type: "ACCEPT_PROPOSAL", cardId });
+  }, []);
+
+  const rejectProposal = useCallback((cardId: string) => {
+    dispatch({ type: "REJECT_PROPOSAL", cardId });
+  }, []);
+
+  const acceptAllProposals = useCallback(() => {
+    dispatch({ type: "ACCEPT_ALL_PROPOSALS" });
+  }, []);
+
+  const rejectAllProposals = useCallback(() => {
+    dispatch({ type: "REJECT_ALL_PROPOSALS" });
+  }, []);
+
+  const clearHighlights = useCallback(() => {
+    dispatch({ type: "CLEAR_HIGHLIGHTS" });
+  }, []);
+
+  return {
+    board, dispatch, moveCard, addCard, updateCard, deleteCard, setGoals,
+    acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
+  };
 }

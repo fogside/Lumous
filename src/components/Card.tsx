@@ -14,6 +14,8 @@ interface Props {
   theme: BoardTheme;
   solo?: boolean;
   goals?: Goal[];
+  onAcceptProposal?: (cardId: string) => void;
+  onRejectProposal?: (cardId: string) => void;
 }
 
 function LabelPicker({ anchor, current, boardColor, theme, onChange, onClose }: { anchor: DOMRect; current: CardLabel | undefined; boardColor?: string; theme: BoardTheme; onChange: (l: CardLabel) => void; onClose: () => void }) {
@@ -83,7 +85,11 @@ function LabelPicker({ anchor, current, boardColor, theme, onChange, onClose }: 
   );
 }
 
-export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, solo, goals }: Props) {
+// Wizard theme color for proposed cards
+const WIZARD_PURPLE = "#b48ac0";
+const WIZARD_GOLD = "#e0c55a";
+
+export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, solo, goals, onAcceptProposal, onRejectProposal }: Props) {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -98,6 +104,28 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
 
   const labelColor = CARD_LABELS.find((l) => l.value === card.label)?.color;
   const goalColor = card.goalId && goals ? goals.find((g) => g.id === card.goalId)?.color : undefined;
+  const isProposed = !!card.proposed;
+  const isHighlighted = !!card.highlighted;
+
+  // Compute border style
+  const borderStyle = isProposed
+    ? `2px dashed ${WIZARD_PURPLE}50`
+    : isHighlighted
+      ? `1px solid ${WIZARD_GOLD}40`
+      : theme.isLight
+        ? "none"
+        : card.label && labelColor
+          ? `1px solid ${labelColor}30`
+          : `1px solid ${theme.border}`;
+
+  // Compute background
+  const bgStyle = isProposed
+    ? `linear-gradient(135deg, ${theme.surface} 60%, ${WIZARD_PURPLE}10 100%)`
+    : isHighlighted
+      ? `linear-gradient(135deg, ${theme.surface} 60%, ${WIZARD_GOLD}12 100%)`
+      : !theme.isLight && card.label && labelColor
+        ? `linear-gradient(135deg, ${theme.surface} 50%, ${labelColor}18 100%)`
+        : theme.surface;
 
   return (
     <div
@@ -108,25 +136,19 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
         borderRadius: 12,
         padding: "10px 14px",
         marginBottom: 8,
-        cursor: "grab",
-        background: !theme.isLight && card.label && labelColor
-          ? `linear-gradient(135deg, ${theme.surface} 50%, ${labelColor}18 100%)`
-          : theme.surface,
-        border: theme.isLight
-          ? "none"
-          : card.label && labelColor
-            ? `1px solid ${labelColor}30`
-            : `1px solid ${theme.border}`,
-        opacity: isDragging ? 0.4 : faded ? 0.4 : 1,
+        cursor: isProposed ? "default" : "grab",
+        background: bgStyle,
+        border: borderStyle,
+        opacity: isDragging ? 0.4 : faded ? 0.4 : isProposed ? 0.85 : 1,
         overflow: "visible",
         userSelect: "none",
         position: "relative",
       }}
       data-no-drag
       data-card
-      {...attributes}
-      {...listeners}
-      onClick={onClick}
+      {...(isProposed ? {} : attributes)}
+      {...(isProposed ? {} : listeners)}
+      onClick={isProposed ? undefined : onClick}
     >
       {/* Clipped glow container — isolation forces own compositing layer
          so overflow:hidden+borderRadius clip survives parent transform */}
@@ -152,39 +174,114 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
         }} />
       </div>
 
-      {/* Crescent label button */}
-      <button
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!showPicker && cardRef.current) {
-            setPickerAnchor(cardRef.current.getBoundingClientRect());
-          }
-          setShowPicker(!showPicker);
-        }}
-        style={{
+      {/* Highlighted card glow */}
+      {isHighlighted && (
+        <div style={{
+          position: "absolute",
+          inset: -1,
+          borderRadius: "inherit",
+          pointerEvents: "none",
+          filter: `drop-shadow(0 0 8px ${WIZARD_GOLD}30)`,
+          animation: "wizard-pulse 2s ease-in-out infinite",
+        }} />
+      )}
+
+      {/* Proposed card: accept/reject buttons */}
+      {isProposed && (
+        <div style={{
           position: "absolute",
           top: 5,
           right: 5,
-          width: 20,
-          height: 20,
-          border: "none",
-          background: "transparent",
-          cursor: "pointer",
-          padding: 0,
-          transition: "opacity 0.15s",
-        }}
-        className={`card-label-btn${card.label ? " has-label" : ""}`}
-        data-no-drag
-      >
-        <svg width="20" height="20" viewBox="0 0 20 20">
-          <mask id={`moon-${card.id}`}>
-            <circle cx="10" cy="10" r="8" fill="white" />
-            <circle cx="14" cy="9" r="6.5" fill="black" />
-          </mask>
-          <circle cx="10" cy="10" r="8" fill={card.label ? labelColor : theme.textTertiary} mask={`url(#moon-${card.id})`} />
-        </svg>
-      </button>
+          display: "flex",
+          gap: 4,
+          zIndex: 2,
+        }}>
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onAcceptProposal?.(card.id); }}
+            title="Accept suggestion"
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 6,
+              border: "none",
+              background: "rgba(100,200,100,0.15)",
+              color: "rgba(100,200,100,0.8)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              padding: 0,
+              transition: "all 0.15s",
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </button>
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onRejectProposal?.(card.id); }}
+            title="Dismiss suggestion"
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 6,
+              border: "none",
+              background: "rgba(220,80,80,0.1)",
+              color: "rgba(220,80,80,0.6)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              padding: 0,
+              transition: "all 0.15s",
+            }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6L6 18" /><path d="M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Crescent label button — hidden on proposed cards */}
+      {!isProposed && (
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!showPicker && cardRef.current) {
+              setPickerAnchor(cardRef.current.getBoundingClientRect());
+            }
+            setShowPicker(!showPicker);
+          }}
+          style={{
+            position: "absolute",
+            top: 5,
+            right: 5,
+            width: 20,
+            height: 20,
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            padding: 0,
+            transition: "opacity 0.15s",
+          }}
+          className={`card-label-btn${card.label ? " has-label" : ""}`}
+          data-no-drag
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20">
+            <mask id={`moon-${card.id}`}>
+              <circle cx="10" cy="10" r="8" fill="white" />
+              <circle cx="14" cy="9" r="6.5" fill="black" />
+            </mask>
+            <circle cx="10" cy="10" r="8" fill={card.label ? labelColor : theme.textTertiary} mask={`url(#moon-${card.id})`} />
+          </svg>
+        </button>
+      )}
 
       {showPicker && !solo && pickerAnchor && (
         <LabelPicker
@@ -248,6 +345,32 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
           {card.description}
         </p>
       )}
+      {/* Wizard reasoning / highlight reason */}
+      {isProposed && card.proposedReasoning && (
+        <p style={{
+          fontSize: 12,
+          color: theme.isLight ? "rgba(120,70,140,0.85)" : "rgba(200,170,220,0.85)",
+          marginTop: 6,
+          lineHeight: 1.4,
+          fontStyle: "italic",
+          margin: "6px 0 0 0",
+        }}>
+          {card.proposedReasoning}
+        </p>
+      )}
+      {isHighlighted && card.highlightReason && (
+        <p style={{
+          fontSize: 12,
+          color: theme.isLight ? "rgba(140,110,30,0.85)" : "rgba(230,210,120,0.85)",
+          marginTop: 6,
+          lineHeight: 1.4,
+          fontStyle: "italic",
+          margin: "6px 0 0 0",
+        }}>
+          {card.highlightReason}
+        </p>
+      )}
+
       <span style={{ fontSize: 11, color: theme.textTertiary, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontWeight: 400 }}>
         {goalColor && (
           <span style={{
@@ -278,6 +401,10 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
         [data-card]:hover .card-label-btn { opacity: 0.5; }
         [data-card] .card-label-btn.has-label { opacity: 0.8; }
         [data-card]:hover .card-label-btn.has-label { opacity: 1; }
+        @keyframes wizard-pulse {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
+        }
       `}</style>
     </div>
   );

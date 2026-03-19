@@ -57,3 +57,7 @@ export async function gitRun(args: string[]): Promise<string> {
 export async function checkOnline(): Promise<boolean> {
   return invoke<boolean>("check_online");
 }
+
+export async function getBoardMtime(id: string): Promise<number> {
+  return invoke<number>("get_board_mtime", { id });
+}

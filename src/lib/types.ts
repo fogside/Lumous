@@ -40,6 +40,11 @@ export interface Card {
   ritual?: {
     schedule: RitualSchedule;
   };
+  // Wizard proposal fields (set by MCP server)
+  proposed?: boolean;
+  proposedReasoning?: string;
+  highlighted?: boolean;
+  highlightReason?: string;
 }
 
 export interface Column {
