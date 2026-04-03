@@ -6,6 +6,7 @@ interface Props {
   board: Board;
   theme: BoardTheme;
   onClose: () => void;
+  onApplied: () => void; // triggers immediate board reload after writing to disk
 }
 
 // Serialize board state compactly for the AI prompt
@@ -71,7 +72,6 @@ Respond with JSON: {"suggestions": [{"title": "...", "columnId": "todo|today|in-
     let jsonStr = result.trim();
     const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) jsonStr = jsonMatch[1].trim();
-    // Also try to find raw JSON object
     const objMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (objMatch) jsonStr = objMatch[0];
 
@@ -81,7 +81,13 @@ Respond with JSON: {"suggestions": [{"title": "...", "columnId": "todo|today|in-
   }
 }
 
-export function MagicianModal({ board, theme, onClose }: Props) {
+const COLUMN_LABELS: Record<string, string> = {
+  "todo": "Todo",
+  "today": "Today",
+  "in-progress": "In Progress",
+};
+
+export function MagicianModal({ board, theme, onClose, onApplied }: Props) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,7 +121,6 @@ export function MagicianModal({ board, theme, onClose }: Props) {
   const handleApply = async () => {
     if (!result) return;
 
-    // Write proposed cards via MCP server (call the same file I/O)
     try {
       const boardData = JSON.parse(await invoke<string>("load_board", { id: board.id }));
 
@@ -135,7 +140,6 @@ export function MagicianModal({ board, theme, onClose }: Props) {
         col.cardIds.unshift(card.id);
       }
 
-      // Highlight existing cards
       if (result.existingCardHighlights) {
         for (const h of result.existingCardHighlights) {
           const match = Object.values(boardData.cards as Record<string, { title: string; highlighted?: boolean; highlightReason?: string }>).find(
@@ -154,223 +158,280 @@ export function MagicianModal({ board, theme, onClose }: Props) {
         data: JSON.stringify(boardData, null, 2),
       });
 
+      onApplied(); // trigger immediate board reload
       onClose();
     } catch (e) {
       setError(`Failed to apply: ${e}`);
     }
   };
 
-  const boardTheme = getBoardTheme(board.backgroundColor);
+  const hasInput = input.trim().length > 0;
 
   return (
     <div
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.6)",
-        backdropFilter: "blur(4px)",
+        background: "rgba(0,0,0,0.5)",
+        backdropFilter: "blur(8px)",
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "center",
+        paddingTop: "10vh",
         zIndex: 50,
       }}
       onClick={onClose}
     >
       <div
         style={{
-          background: DARK_INK,
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: 24,
-          width: 560,
-          maxWidth: "90vw",
-          padding: "36px 40px",
-          boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
+          background: `linear-gradient(180deg, #141822 0%, ${DARK_INK} 100%)`,
+          borderRadius: 18,
+          width: 580,
+          maxWidth: "92vw",
+          maxHeight: "75vh",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 0 0 1px rgba(255,255,255,0.06), 0 20px 60px rgba(0,0,0,0.5), 0 0 100px rgba(140,100,180,0.05)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <span style={{ fontSize: 22 }}>{"🧙"}</span>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: "rgba(255,255,255,0.95)", margin: 0 }}>
+        {/* Header with wizard */}
+        <div style={{
+          padding: "22px 26px 0 26px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 14,
+        }}>
+          <span style={{ fontSize: 24 }}>{"🧙"}</span>
+          <span style={{
+            fontSize: 16,
+            fontWeight: 600,
+            color: "rgba(255,255,255,0.7)",
+            letterSpacing: "-0.01em",
+          }}>
             Ask the Wizard
-          </h2>
+          </span>
         </div>
-        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", lineHeight: 1.5, marginBottom: 24 }}>
-          Describe what you need to do — the wizard will suggest cards for your board.
-        </p>
 
-        {/* Text input */}
-        <textarea
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && e.metaKey) handleSubmit();
-          }}
-          placeholder="e.g. I need to prepare for the team meeting, write tests for the auth module, and plan my weekend trip..."
-          data-no-drag
-          style={{
-            width: "100%",
-            minHeight: 100,
-            background: "rgba(255,255,255,0.05)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            borderRadius: 12,
-            padding: "14px 18px",
-            fontSize: 14,
-            color: "white",
-            outline: "none",
-            resize: "vertical",
-            lineHeight: 1.6,
-            fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
-          }}
-        />
-        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 6, marginBottom: 20 }}>
-          Tip: Press Fn Fn to dictate · Cmd+Enter to summon
-        </p>
+        {/* Input area */}
+        <div style={{ padding: "0 26px" }}>
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && e.metaKey) handleSubmit();
+            }}
+            placeholder="What do you need to do?"
+            data-no-drag
+            rows={4}
+            style={{
+              width: "100%",
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              fontSize: 16,
+              color: "rgba(255,255,255,0.9)",
+              outline: "none",
+              resize: "none",
+              lineHeight: 1.65,
+              fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
+              fontWeight: 400,
+            }}
+          />
+        </div>
+
+        {/* Divider + hint row */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "12px 26px",
+          borderTop: "1px solid rgba(255,255,255,0.04)",
+        }}>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.16)", fontWeight: 400 }}>
+            {loading ? "The wizard is thinking..." : "Fn Fn to dictate"}
+          </span>
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !hasInput}
+            style={{
+              padding: "6px 16px",
+              fontSize: 12,
+              fontWeight: 600,
+              color: loading || !hasInput ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.85)",
+              background: loading || !hasInput ? "transparent" : "rgba(255,255,255,0.08)",
+              border: "none",
+              borderRadius: 7,
+              cursor: loading || !hasInput ? "default" : "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            {loading ? (
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ animation: "wizard-spin 1s linear infinite", display: "inline-block" }}>{"✦"}</span>
+                Summoning
+              </span>
+            ) : (
+              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                {"✦"} Summon
+                <kbd style={{
+                  fontSize: 10,
+                  padding: "1px 5px",
+                  borderRadius: 4,
+                  background: "rgba(255,255,255,0.06)",
+                  color: "rgba(255,255,255,0.22)",
+                  fontFamily: "-apple-system",
+                  fontWeight: 500,
+                }}>{"⌘↵"}</kbd>
+              </span>
+            )}
+          </button>
+        </div>
 
         {/* Error */}
         {error && (
           <div style={{
-            padding: "10px 14px",
-            borderRadius: 10,
-            background: "rgba(220,80,80,0.1)",
-            border: "1px solid rgba(220,80,80,0.2)",
-            color: "rgba(220,80,80,0.8)",
+            padding: "12px 26px",
+            background: "rgba(220,80,80,0.06)",
+            color: "rgba(220,120,120,0.8)",
             fontSize: 13,
-            marginBottom: 16,
             lineHeight: 1.5,
+            borderTop: "1px solid rgba(220,80,80,0.08)",
           }}>
             {error}
           </div>
         )}
 
-        {/* Loading */}
-        {loading && (
-          <div style={{
-            padding: "16px 0",
-            textAlign: "center",
-            color: "rgba(180,138,192,0.7)",
-            fontSize: 13,
-            fontStyle: "italic",
-          }}>
-            The wizard is thinking...
-          </div>
-        )}
-
-        {/* Results preview */}
+        {/* Results */}
         {result && (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>
-              Suggestions
+          <div style={{
+            borderTop: "1px solid rgba(255,255,255,0.04)",
+            overflowY: "auto",
+            flex: 1,
+          }}>
+            {/* Section header */}
+            <div style={{
+              padding: "14px 26px 6px 26px",
+              fontSize: 11,
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.22)",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}>
+              {"🧙"} Wizard suggests
             </div>
+
             {result.suggestions.map((s, i) => (
               <div key={i} style={{
-                padding: "10px 14px",
-                borderRadius: 10,
-                background: "rgba(180,138,192,0.06)",
-                border: "1px dashed rgba(180,138,192,0.2)",
-                marginBottom: 6,
+                padding: "14px 26px",
+                borderBottom: "1px solid rgba(255,255,255,0.03)",
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 14, color: "rgba(255,255,255,0.9)", fontWeight: 500, flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                  <span style={{
+                    fontSize: 15,
+                    color: "rgba(255,255,255,0.9)",
+                    fontWeight: 500,
+                    flex: 1,
+                    lineHeight: 1.4,
+                  }}>
                     {s.title}
                   </span>
                   <span style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: "rgba(255,255,255,0.3)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
+                    fontSize: 11,
+                    color: "rgba(255,255,255,0.22)",
+                    fontWeight: 500,
+                    flexShrink: 0,
                   }}>
-                    {s.columnId}
+                    {COLUMN_LABELS[s.columnId] || s.columnId}
                   </span>
                 </div>
                 {s.description && (
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 4, margin: "4px 0 0 0" }}>
+                  <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: "5px 0 0 0", lineHeight: 1.45 }}>
                     {s.description}
                   </p>
                 )}
-                <p style={{ fontSize: 12, color: "rgba(200,170,220,0.7)", fontStyle: "italic", margin: "4px 0 0 0" }}>
+                <p style={{ fontSize: 12, color: "rgba(180,160,210,0.5)", margin: "5px 0 0 0", lineHeight: 1.4 }}>
                   {s.reasoning}
                 </p>
               </div>
             ))}
 
             {result.existingCardHighlights && result.existingCardHighlights.length > 0 && (
-              <>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.12em", marginTop: 14, marginBottom: 8 }}>
-                  Related existing cards
+              <div style={{ padding: "12px 26px 8px 26px" }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.22)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                  Already on your board
                 </div>
                 {result.existingCardHighlights.map((h, i) => (
-                  <div key={i} style={{
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    background: "rgba(224,197,90,0.06)",
-                    border: "1px solid rgba(224,197,90,0.15)",
-                    marginBottom: 4,
+                  <p key={i} style={{
                     fontSize: 13,
-                    color: "rgba(230,210,120,0.8)",
+                    color: "rgba(224,200,120,0.6)",
+                    margin: "0 0 5px 0",
+                    lineHeight: 1.45,
                   }}>
-                    <strong>{h.cardTitle}</strong> — {h.reason}
-                  </div>
+                    {h.cardTitle} <span style={{ color: "rgba(255,255,255,0.12)" }}>—</span> {h.reason}
+                  </p>
                 ))}
-              </>
+              </div>
             )}
+
+            {/* Apply bar */}
+            <div style={{
+              padding: "14px 26px",
+              borderTop: "1px solid rgba(255,255,255,0.04)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: "rgba(0,0,0,0.15)",
+            }}>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.22)" }}>
+                {result.suggestions.length} card{result.suggestions.length !== 1 ? "s" : ""} suggested
+              </span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={onClose}
+                  style={{
+                    padding: "7px 16px",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: "rgba(255,255,255,0.35)",
+                    background: "transparent",
+                    border: "none",
+                    borderRadius: 7,
+                    cursor: "pointer",
+                  }}
+                >
+                  Dismiss
+                </button>
+                <button
+                  onClick={handleApply}
+                  style={{
+                    padding: "7px 16px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "rgba(255,255,255,0.9)",
+                    background: "rgba(255,255,255,0.1)",
+                    border: "none",
+                    borderRadius: 7,
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {"🧙"} Add to board
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Buttons */}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: "10px 24px",
-              fontSize: 13,
-              fontWeight: 500,
-              color: "rgba(255,255,255,0.5)",
-              background: "transparent",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 12,
-              cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
-          {result ? (
-            <button
-              onClick={handleApply}
-              style={{
-                padding: "10px 24px",
-                fontSize: 13,
-                fontWeight: 600,
-                color: "white",
-                background: "rgba(180,138,192,0.2)",
-                border: "1px solid rgba(180,138,192,0.3)",
-                borderRadius: 12,
-                cursor: "pointer",
-              }}
-            >
-              Apply to board
-            </button>
-          ) : (
-            <button
-              onClick={handleSubmit}
-              disabled={loading || !input.trim()}
-              style={{
-                padding: "10px 24px",
-                fontSize: 13,
-                fontWeight: 600,
-                color: loading || !input.trim() ? "rgba(255,255,255,0.3)" : "white",
-                background: loading || !input.trim() ? "rgba(255,255,255,0.05)" : "rgba(180,138,192,0.2)",
-                border: "1px solid rgba(180,138,192,0.2)",
-                borderRadius: 12,
-                cursor: loading || !input.trim() ? "default" : "pointer",
-              }}
-            >
-              Summon
-            </button>
-          )}
-        </div>
+        <style>{`
+          @keyframes wizard-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     </div>
   );

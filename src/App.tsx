@@ -40,6 +40,7 @@ export default function App() {
   const {
     board, moveCard, addCard, updateCard, deleteCard, setGoals,
     acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
+    reloadFromDisk,
   } = useBoard(activeBoard, handleBoardChanged);
   const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings);
   const { mode } = useWindowSize();
@@ -224,6 +225,7 @@ export default function App() {
           board={activeBoardId ? allBoards[activeBoardId] || board : board}
           theme={getBoardTheme((activeBoardId ? allBoards[activeBoardId] || board : board).backgroundColor)}
           onClose={() => setShowMagician(false)}
+          onApplied={reloadFromDisk}
         />
       )}
     </div>

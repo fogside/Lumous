@@ -355,8 +355,25 @@ export function useBoard(
     dispatch({ type: "CLEAR_HIGHLIGHTS" });
   }, []);
 
+  // Force reload board from disk (e.g., after MagicianModal writes proposed cards)
+  const reloadFromDisk = useCallback(async () => {
+    const boardId = initialBoard?.id;
+    if (!boardId) return;
+    try {
+      const fresh = await loadBoard(boardId);
+      suppressSaveRef.current = true;
+      lastSetBoardRef.current = fresh;
+      dispatch({ type: "SET_BOARD", board: fresh });
+      onBoardChanged?.(fresh);
+      // Update mtime so polling doesn't double-reload
+      const mt = await getBoardMtime(boardId);
+      lastMtimeRef.current = mt;
+    } catch { /* ignore */ }
+  }, [initialBoard?.id, onBoardChanged]);
+
   return {
     board, dispatch, moveCard, addCard, updateCard, deleteCard, setGoals,
     acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
+    reloadFromDisk,
   };
 }
