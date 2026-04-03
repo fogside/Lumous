@@ -14,7 +14,7 @@ import { ShadowBoardView } from "./components/ShadowBoardView";
 import { BoardSettingsModal } from "./components/BoardSettingsModal";
 import { NewBoardModal } from "./components/NewBoardModal";
 import { SyncSettingsModal } from "./components/SyncSettingsModal";
-import { MagicianModal } from "./components/MagicianModal";
+import { WizardPanel } from "./components/WizardPanel";
 
 export default function App() {
   const {
@@ -40,7 +40,7 @@ export default function App() {
   const {
     board, moveCard, addCard, updateCard, deleteCard, setGoals,
     acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
-    reloadFromDisk,
+    reorderColumn, setTimeEstimates, reloadFromDisk,
   } = useBoard(activeBoard, handleBoardChanged);
   const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings);
   const { mode } = useWindowSize();
@@ -51,7 +51,7 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [shadowBoardId, setShadowBoardId] = useState<string | null>(null);
   const [showWisps, setShowWisps] = useState(true);
-  const [showMagician, setShowMagician] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
 
   if (loading) {
     return (
@@ -148,7 +148,7 @@ export default function App() {
               acceptAllProposals={acceptAllProposals}
               rejectAllProposals={rejectAllProposals}
               clearHighlights={clearHighlights}
-              onOpenMagician={() => setShowMagician(true)}
+              onOpenMagician={() => setShowWizard((v) => !v)}
             />
           )
         ) : (
@@ -194,6 +194,19 @@ export default function App() {
         })()}
       </main>
 
+      {showWizard && board && !isCompact && (
+        <WizardPanel
+          board={activeBoardId ? allBoards[activeBoardId] || board : board}
+          meta={meta}
+          onClose={() => setShowWizard(false)}
+          updateCard={updateCard}
+          reorderColumn={reorderColumn}
+          setTimeEstimates={setTimeEstimates}
+          reloadFromDisk={reloadFromDisk}
+          updateSettings={updateSettings}
+        />
+      )}
+
       {editingBoard && (
         <BoardSettingsModal
           title={editingBoard.title}
@@ -220,14 +233,6 @@ export default function App() {
         />
       )}
 
-      {showMagician && board && (
-        <MagicianModal
-          board={activeBoardId ? allBoards[activeBoardId] || board : board}
-          theme={getBoardTheme((activeBoardId ? allBoards[activeBoardId] || board : board).backgroundColor)}
-          onClose={() => setShowMagician(false)}
-          onApplied={reloadFromDisk}
-        />
-      )}
     </div>
   );
 }

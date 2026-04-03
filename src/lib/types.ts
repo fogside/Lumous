@@ -40,6 +40,7 @@ export interface Card {
   ritual?: {
     schedule: RitualSchedule;
   };
+  timeEstimate?: string;  // e.g. "15min", "1h", "2h"
   // Wizard proposal fields (set by MCP server)
   proposed?: boolean;
   proposedReasoning?: string;
@@ -68,6 +69,7 @@ export interface Settings {
   syncRepoUrl: string;
   syncIntervalMinutes: number;
   lastSyncedAt: string | null;
+  wizardMemories?: string[];  // persistent wizard preferences/rules across all boards
 }
 
 export interface Meta {

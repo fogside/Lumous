@@ -14,7 +14,9 @@ type Action =
   | { type: "REJECT_PROPOSAL"; cardId: string }
   | { type: "ACCEPT_ALL_PROPOSALS" }
   | { type: "REJECT_ALL_PROPOSALS" }
-  | { type: "CLEAR_HIGHLIGHTS" };
+  | { type: "CLEAR_HIGHLIGHTS" }
+  | { type: "REORDER_COLUMN"; columnId: string; cardIds: string[] }
+  | { type: "SET_TIME_ESTIMATES"; estimates: Record<string, string> };
 
 function boardReducer(state: Board | null, action: Action): Board | null {
   if (action.type === "SET_BOARD") return action.board;
@@ -182,6 +184,29 @@ function boardReducer(state: Board | null, action: Action): Board | null {
         cardIds: col.cardIds.filter((id) => !proposedIds.has(id)),
       }));
       return { ...state, cards, columns };
+    }
+
+    case "REORDER_COLUMN": {
+      const { columnId, cardIds } = action;
+      // Only keep IDs that actually exist in cards
+      const validIds = cardIds.filter((id) => state.cards[id]);
+      const columns = state.columns.map((col) => {
+        if (col.id !== columnId) return col;
+        // Preserve any cards in the column that weren't in the new order
+        const remaining = col.cardIds.filter((id) => !validIds.includes(id));
+        return { ...col, cardIds: [...validIds, ...remaining] };
+      });
+      return { ...state, columns };
+    }
+
+    case "SET_TIME_ESTIMATES": {
+      const cards = { ...state.cards };
+      for (const [id, estimate] of Object.entries(action.estimates)) {
+        if (cards[id]) {
+          cards[id] = { ...cards[id], timeEstimate: estimate };
+        }
+      }
+      return { ...state, cards };
     }
 
     case "CLEAR_HIGHLIGHTS": {
@@ -355,6 +380,14 @@ export function useBoard(
     dispatch({ type: "CLEAR_HIGHLIGHTS" });
   }, []);
 
+  const reorderColumn = useCallback((columnId: string, cardIds: string[]) => {
+    dispatch({ type: "REORDER_COLUMN", columnId, cardIds });
+  }, []);
+
+  const setTimeEstimates = useCallback((estimates: Record<string, string>) => {
+    dispatch({ type: "SET_TIME_ESTIMATES", estimates });
+  }, []);
+
   // Force reload board from disk (e.g., after MagicianModal writes proposed cards)
   const reloadFromDisk = useCallback(async () => {
     const boardId = initialBoard?.id;
@@ -374,6 +407,6 @@ export function useBoard(
   return {
     board, dispatch, moveCard, addCard, updateCard, deleteCard, setGoals,
     acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
-    reloadFromDisk,
+    reorderColumn, setTimeEstimates, reloadFromDisk,
   };
 }

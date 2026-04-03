@@ -372,6 +372,19 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
       )}
 
       <span style={{ fontSize: 11, color: theme.textTertiary, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontWeight: 400 }}>
+        {card.timeEstimate && (
+          <span style={{
+            fontSize: 10,
+            fontWeight: 600,
+            padding: "1px 6px",
+            borderRadius: 5,
+            background: theme.isLight ? "rgba(120,70,140,0.1)" : "rgba(180,138,192,0.12)",
+            color: theme.isLight ? "rgba(120,70,140,0.75)" : "rgba(200,170,220,0.8)",
+            letterSpacing: "0.02em",
+          }}>
+            {card.timeEstimate}
+          </span>
+        )}
         {goalColor && (
           <span style={{
             width: 7,
