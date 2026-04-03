@@ -81,6 +81,72 @@ fn get_data_dir(app: tauri::AppHandle) -> Result<String, String> {
     Ok(path.to_string_lossy().to_string())
 }
 
+/// Strip transient wizard fields (proposed cards, highlights) from all board files.
+/// Called before git sync so wizard-local state doesn't get committed.
+#[tauri::command]
+fn strip_wizard_transient(app: tauri::AppHandle) -> Result<(), String> {
+    let boards_dir = get_data_path(&app).join("boards");
+    let entries = fs::read_dir(&boards_dir).map_err(|e| e.to_string())?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let mut board: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let mut changed = false;
+        if let Some(cards) = board.get_mut("cards").and_then(|c| c.as_object_mut()) {
+            // Collect IDs of proposed cards to remove entirely
+            let proposed_ids: Vec<String> = cards.iter()
+                .filter(|(_, v)| v.get("proposed").and_then(|p| p.as_bool()).unwrap_or(false))
+                .map(|(k, _)| k.clone())
+                .collect();
+
+            for id in &proposed_ids {
+                cards.remove(id);
+                changed = true;
+            }
+
+            // Strip highlight fields from remaining cards
+            for (_, card) in cards.iter_mut() {
+                if let Some(obj) = card.as_object_mut() {
+                    if obj.remove("highlighted").is_some() { changed = true; }
+                    if obj.remove("highlightReason").is_some() { changed = true; }
+                }
+            }
+
+            // Remove proposed card IDs from column cardIds arrays
+            if !proposed_ids.is_empty() {
+                if let Some(columns) = board.get_mut("columns").and_then(|c| c.as_array_mut()) {
+                    for col in columns.iter_mut() {
+                        if let Some(card_ids) = col.get_mut("cardIds").and_then(|c| c.as_array_mut()) {
+                            let before = card_ids.len();
+                            card_ids.retain(|id| {
+                                id.as_str().map(|s| !proposed_ids.contains(&s.to_string())).unwrap_or(true)
+                            });
+                            if card_ids.len() != before { changed = true; }
+                        }
+                    }
+                }
+            }
+        }
+
+        if changed {
+            let clean = serde_json::to_string_pretty(&board).map_err(|e| e.to_string())?;
+            fs::write(&path, clean).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn git_run(app: tauri::AppHandle, args: Vec<String>) -> Result<String, String> {
     let dir = get_data_path(&app);
@@ -203,6 +269,7 @@ pub fn run() {
             delete_board_file,
             get_data_dir,
             get_board_mtime,
+            strip_wizard_transient,
             run_claude,
             git_run,
             check_online,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { gitRun, checkOnline } from "../lib/storage";
+import { gitRun, checkOnline, stripWizardTransient } from "../lib/storage";
 import { Meta } from "../lib/types";
 
 type SyncState = "idle" | "syncing" | "success" | "error";
@@ -41,6 +41,10 @@ export function useSync(
 
       // Flush any pending board saves before committing
       if (flushSave) await flushSave();
+
+      // Strip wizard-transient data (proposed cards, highlights) before committing
+      // These are local-only — only accepted cards should be in git
+      await stripWizardTransient();
 
       // Stage and commit local changes
       await gitRun(["add", "-A"]);

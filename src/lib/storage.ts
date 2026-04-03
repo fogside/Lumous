@@ -72,6 +72,10 @@ export async function checkOnline(): Promise<boolean> {
   return invoke<boolean>("check_online");
 }
 
+export async function stripWizardTransient(): Promise<void> {
+  await invoke("strip_wizard_transient");
+}
+
 export async function getBoardMtime(id: string): Promise<number> {
   return invoke<number>("get_board_mtime", { id });
 }
