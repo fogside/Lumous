@@ -428,16 +428,22 @@ export function useBoard(
   }, []);
 
   // Force reload board from disk (e.g., after MagicianModal writes proposed cards)
+  // Flushes any pending saves first to avoid losing in-flight reducer changes
   const reloadFromDisk = useCallback(async () => {
     const boardId = initialBoard?.id;
     if (!boardId) return;
     try {
+      // Flush pending saves so they're on disk before we reload
+      if (dirtyRef.current && boardRef.current) {
+        clearTimeout(saveTimeout.current);
+        await saveBoard(boardRef.current);
+        dirtyRef.current = false;
+      }
       const fresh = await loadBoard(boardId);
       suppressSaveRef.current = true;
       lastSetBoardRef.current = fresh;
       dispatch({ type: "SET_BOARD", board: fresh });
       onBoardChanged?.(fresh);
-      // Update mtime so polling doesn't double-reload
       const mt = await getBoardMtime(boardId);
       lastMtimeRef.current = mt;
     } catch { /* ignore */ }

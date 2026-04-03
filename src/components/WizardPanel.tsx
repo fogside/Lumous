@@ -324,6 +324,15 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
               boardData.cards[realId].completedAt = now;
               if (!boardData.completionLog) boardData.completionLog = [];
               boardData.completionLog.push(now);
+              // Update ritualLog for ritual cards
+              if (boardData.cards[realId].ritual) {
+                if (!boardData.ritualLog) boardData.ritualLog = [];
+                boardData.ritualLog.push({
+                  date: now.slice(0, 10),
+                  cardId: realId,
+                  goalId: boardData.cards[realId].goalId,
+                });
+              }
             } else if (fromCol.id === "completed" && boardData.cards[realId]) {
               boardData.cards[realId].completedAt = null;
             }

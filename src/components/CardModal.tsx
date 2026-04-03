@@ -31,10 +31,38 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
     card.ritual?.schedule || "daily"
   );
 
+  // Track which fields the user has manually edited (don't overwrite those from prop updates)
+  const userEditedRef = useRef<Set<string>>(new Set());
+  const cardIdRef = useRef(card.id);
+
   useEffect(() => {
     titleRef.current?.focus();
     titleRef.current?.select();
   }, []);
+
+  // Sync from card prop when external changes arrive (e.g., wizard sets label/ritual/timeEstimate)
+  // but don't overwrite fields the user is actively editing
+  useEffect(() => {
+    if (card.id !== cardIdRef.current) {
+      // Different card entirely — reset everything
+      cardIdRef.current = card.id;
+      userEditedRef.current.clear();
+      setTitle(card.title);
+      setDescription(card.description);
+      setLabel(card.label);
+      setGoalId(card.goalId);
+      setRitualEnabled(!!card.ritual);
+      setRitualSchedule(card.ritual?.schedule || "daily");
+      return;
+    }
+    // Same card, external update — sync fields the user hasn't touched
+    if (!userEditedRef.current.has("label")) setLabel(card.label);
+    if (!userEditedRef.current.has("goalId")) setGoalId(card.goalId);
+    if (!userEditedRef.current.has("ritual")) {
+      setRitualEnabled(!!card.ritual);
+      setRitualSchedule(card.ritual?.schedule || "daily");
+    }
+  }, [card]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -229,7 +257,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
               {CARD_LABELS.map((l) => (
                 <button
                   key={l.name}
-                  onClick={() => setLabel(l.value)}
+                  onClick={() => { userEditedRef.current.add("label"); setLabel(l.value); }}
                   style={{
                     width: 28,
                     height: 28,
@@ -262,7 +290,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
                 Repeat
               </span>
               <button
-                onClick={() => setRitualEnabled(!ritualEnabled)}
+                onClick={() => { userEditedRef.current.add("ritual"); setRitualEnabled(!ritualEnabled); }}
                 style={{
                   width: 34, height: 18, borderRadius: 9, border: "none",
                   background: ritualEnabled ? "rgba(124,196,138,0.45)" : "rgba(255,255,255,0.08)",
@@ -356,7 +384,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
               </div>
               <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                 <button
-                  onClick={() => setGoalId(undefined)}
+                  onClick={() => { userEditedRef.current.add("goalId"); setGoalId(undefined); }}
                   style={{
                     padding: "6px 14px", borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: "pointer",
                     background: !goalId ? "rgba(255,255,255,0.1)" : "transparent",
@@ -370,7 +398,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
                 {goals.map((g) => (
                   <button
                     key={g.id}
-                    onClick={() => setGoalId(g.id)}
+                    onClick={() => { userEditedRef.current.add("goalId"); setGoalId(g.id); }}
                     style={{
                       padding: "6px 14px", borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: "pointer",
                       background: goalId === g.id ? `${g.color}20` : "transparent",
