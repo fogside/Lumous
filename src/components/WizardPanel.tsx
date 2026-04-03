@@ -98,7 +98,7 @@ Response schema:
 Rules:
 - "text" is ALWAYS required — be warm, concise, supportive. Use markdown formatting for readability
 - Keep "text" SHORT — 2-4 sentences max for simple responses. Use bullet points for lists, not prose
-- Include "newCards" ONLY when the user mentions tasks not already on the board
+- NEVER create new cards for tasks that already exist in Todo, Today, or In Progress columns — instead use "highlights" to point them out, or "moveCards" to reprioritize them. Only create new cards for genuinely new tasks not on the board
 - Include "dayPlan" when the user asks about planning, priorities, or what to focus on
 - "dayPlan.order" must contain ALL card IDs from that column in priority order
 - Use "NEW_0", "NEW_1" to reference new cards in dayPlan.order
@@ -500,6 +500,20 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
           // Wizard message
           const r = msg.response;
           const showApply = hasActions(msg) && !msg.applied;
+
+          // Resolve card ID → title, checking both board state and newCards from this response
+          const resolveTitle = (id: string): string => {
+            if (id.startsWith("NEW_") && r.newCards) {
+              const idx = parseInt(id.split("_")[1]);
+              if (r.newCards[idx]) return r.newCards[idx].title;
+            }
+            if (board.cards[id]) return board.cards[id].title;
+            // Try partial match — Claude sometimes returns truncated IDs
+            const match = Object.entries(board.cards).find(([k]) => k.startsWith(id) || id.startsWith(k));
+            if (match) return match[1].title;
+            return id.slice(0, 8) + "…";
+          };
+
           const actionSummary: string[] = [];
           if (r.newCards?.length) actionSummary.push(`${r.newCards.length} card${r.newCards.length > 1 ? "s" : ""}`);
           if (r.dayPlan) actionSummary.push("day plan");
@@ -553,11 +567,7 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
               {r.dayPlan && (
                 <div style={{ padding: "0 4px" }}>
                   {r.dayPlan.order.map((id, j) => {
-                    const isNew = id.startsWith("NEW_");
-                    const newIdx = isNew ? parseInt(id.split("_")[1]) : -1;
-                    const title = isNew && r.newCards?.[newIdx]
-                      ? r.newCards[newIdx].title
-                      : board.cards[id]?.title || id;
+                    const title = resolveTitle(id);
                     const est = r.dayPlan!.timeEstimates?.[id];
                     return (
                       <div key={j} style={{
@@ -588,7 +598,7 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
               {r.labels && r.labels.length > 0 && (
                 <div style={{ padding: "0 4px" }}>
                   {r.labels.map((lbl, j) => {
-                    const cardTitle = board.cards[lbl.cardId]?.title || lbl.cardId;
+                    const cardTitle = resolveTitle(lbl.cardId);
                     return (
                       <div key={j} style={{
                         fontSize: 12,
@@ -614,7 +624,7 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
               {r.rituals && r.rituals.length > 0 && (
                 <div style={{ padding: "0 4px" }}>
                   {r.rituals.map((rit, j) => {
-                    const cardTitle = board.cards[rit.cardId]?.title || rit.cardId;
+                    const cardTitle = resolveTitle(rit.cardId);
                     const scheduleLabel = !rit.schedule ? "removed"
                       : rit.schedule === "daily" ? "daily"
                       : Array.isArray(rit.schedule) && rit.schedule.join(",") === "1,2,3,4,5" ? "weekdays"
@@ -641,7 +651,7 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
               {r.moveCards && r.moveCards.length > 0 && (
                 <div style={{ padding: "0 4px" }}>
                   {r.moveCards.map((mv, j) => {
-                    const cardTitle = board.cards[mv.cardId]?.title || mv.cardId;
+                    const cardTitle = resolveTitle(mv.cardId);
                     const colName = board.columns.find((c) => c.id === mv.toColumn)?.title || mv.toColumn;
                     return (
                       <div key={j} style={{
@@ -664,7 +674,7 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
               {r.research && r.research.length > 0 && (
                 <div style={{ padding: "0 4px" }}>
                   {r.research.map((job, j) => {
-                    const cardTitle = board.cards[job.cardId]?.title || job.cardId;
+                    const cardTitle = resolveTitle(job.cardId);
                     return (
                       <div key={j} style={{
                         fontSize: 12,
