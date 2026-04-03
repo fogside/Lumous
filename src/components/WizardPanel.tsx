@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { Board, Card, DARK_INK, Meta } from "../lib/types";
+import { Board, Card, CARD_LABELS, DARK_INK, Meta } from "../lib/types";
 import { invoke } from "@tauri-apps/api/core";
 import { loadMeta, saveMeta } from "../lib/storage";
 import { renderMarkdown } from "../lib/markdown";
+
+const PANEL_WIDTH = 360;
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -15,7 +17,11 @@ interface WizardResponse {
     timeEstimates?: Record<string, string>;
   };
   highlights?: { cardId: string; reason: string }[];
-  remember?: string[]; // memories to save
+  research?: { cardId: string; context: string }[];
+  labels?: { cardId: string; label: string }[];
+  rituals?: { cardId: string; schedule: "daily" | number[] | null }[];
+  moveCards?: { cardId: string; toColumn: string }[];
+  remember?: string[];
 }
 
 type ChatMessage =
@@ -32,6 +38,8 @@ interface Props {
   setTimeEstimates: (estimates: Record<string, string>) => void;
   reloadFromDisk: () => void;
   updateSettings: (settings: Partial<Meta["settings"]>) => void;
+  startResearch: (card: Card, context: string) => void;
+  moveCard: (cardId: string, fromCol: string, toCol: string, toIndex: number) => void;
 }
 
 // ─── Board serializer ───────────────────────────────────────────
@@ -76,10 +84,14 @@ You ALWAYS respond with a single JSON object. No markdown, no code fences — ju
 
 Response schema:
 {
-  "text": "Your conversational message (supports **bold**, *italic*, lists with - prefix). Keep it concise — use short paragraphs and bullet points for readability.",
+  "text": "Your conversational message (supports **bold**, *italic*, lists with - prefix). Keep it concise.",
   "newCards": [{"title": "...", "columnId": "todo|today|in-progress", "description": "optional", "reasoning": "optional"}],
   "dayPlan": {"columnId": "today", "order": ["existing-card-id", "NEW_0"], "timeEstimates": {"card-id": "30min"}},
   "highlights": [{"cardId": "existing-card-id", "reason": "why relevant"}],
+  "research": [{"cardId": "existing-card-id", "context": "what to research about this card"}],
+  "labels": [{"cardId": "existing-card-id", "label": "ember|honey|sage|slate|plum|rose|copper|ultramarine"}],
+  "rituals": [{"cardId": "existing-card-id", "schedule": "daily or [0,1,2,3,4,5] (0=Sun..6=Sat) or null to remove"}],
+  "moveCards": [{"cardId": "existing-card-id", "toColumn": "todo|today|in-progress|completed"}],
   "remember": ["preference or rule to save for future sessions"]
 }
 
@@ -92,7 +104,11 @@ Rules:
 - Use "NEW_0", "NEW_1" to reference new cards in dayPlan.order
 - "timeEstimates": realistic values like "10min", "15min", "30min", "45min", "1h", "1.5h", "2h"
 - Include "highlights" when existing cards relate to what the user mentioned
-- Include "remember" when the user says "remember that...", "I always...", "my X usually takes...", or expresses a recurring preference. Save it as a clear, reusable rule
+- Include "research" when the user asks to research a specific card or topic that matches an existing card. This triggers a deep background research job on that card — the results will appear in the card's description. Use the card's ID and provide a clear research context
+- Include "labels" to assign color labels to cards. Available labels: ember (red-orange), honey (yellow), sage (green), slate (blue), plum (purple), rose (pink), copper (warm brown), ultramarine (deep purple). Use null to remove a label. Apply labels when the user asks to categorize, color-code, or tag cards
+- Include "moveCards" to move cards between columns. Use when the user says they completed a task, started working on something, or wants to reprioritize. Columns: "todo", "today", "in-progress", "completed". Moving to "completed" marks the task as done
+- Include "rituals" to make cards recurring. Use "daily" for every day, a number array for specific days (0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat), e.g. [1,2,3,4,5] for weekdays. Use null to remove a recurring schedule. When completed, ritual cards automatically respawn in the Today column on their next scheduled day
+- Include "remember" when the user says "remember that...", "I always...", "my X usually takes...", or expresses a recurring preference
 - Keep card titles concise (3-8 words)
 - You can ask clarifying questions — just set "text" with your question
 - Be encouraging, not overwhelming. If the user seems stressed, suggest a focused subset${memoryBlock}`;
@@ -100,7 +116,7 @@ Rules:
 
 // ─── Component ──────────────────────────────────────────────────
 
-export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, setTimeEstimates, reloadFromDisk, updateSettings }: Props) {
+export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, setTimeEstimates, reloadFromDisk, updateSettings, startResearch, moveCard }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -108,6 +124,7 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const memories = meta?.settings.wizardMemories || [];
+  const [showMemories, setShowMemories] = useState(false);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
@@ -179,7 +196,7 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
   const hasActions = (msg: ChatMessage): msg is { role: "wizard"; response: WizardResponse; applied?: boolean } => {
     if (msg.role !== "wizard") return false;
     const r = msg.response;
-    return !!(r.newCards?.length || r.dayPlan || r.highlights?.length);
+    return !!(r.newCards?.length || r.dayPlan || r.highlights?.length || r.research?.length || r.labels?.length || r.rituals?.length || r.moveCards?.length);
   };
 
   const applyActions = async (msgIndex: number) => {
@@ -250,6 +267,48 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
         }
       }
 
+      // Step 3: Apply labels to cards
+      if (r.labels?.length) {
+        for (const lbl of r.labels) {
+          const card = board.cards[lbl.cardId];
+          if (card) {
+            const labelValue = lbl.label === "null" || !lbl.label ? undefined : lbl.label;
+            updateCard({ ...card, label: labelValue as Card["label"] });
+          }
+        }
+      }
+
+      // Step 4: Set ritual schedules on cards
+      if (r.rituals?.length) {
+        for (const rit of r.rituals) {
+          const card = board.cards[rit.cardId];
+          if (card) {
+            updateCard({
+              ...card,
+              ritual: rit.schedule ? { schedule: rit.schedule } : undefined,
+            });
+          }
+        }
+      }
+
+      // Step 5: Move cards between columns
+      if (r.moveCards?.length) {
+        for (const mv of r.moveCards) {
+          const fromCol = board.columns.find((c) => c.cardIds.includes(mv.cardId));
+          if (fromCol && fromCol.id !== mv.toColumn) {
+            moveCard(mv.cardId, fromCol.id, mv.toColumn, 0);
+          }
+        }
+      }
+
+      // Step 6: Trigger background research on specified cards
+      if (r.research?.length) {
+        for (const job of r.research) {
+          const card = board.cards[job.cardId];
+          if (card) startResearch(card, job.context);
+        }
+      }
+
       setMessages((prev) =>
         prev.map((m, i) => i === msgIndex && m.role === "wizard" ? { ...m, applied: true } : m)
       );
@@ -260,8 +319,8 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
 
   return (
     <div style={{
-      width: 360,
-      minWidth: 360,
+      width: PANEL_WIDTH,
+      minWidth: PANEL_WIDTH,
       height: "100%",
       background: `linear-gradient(180deg, #141822 0%, ${DARK_INK} 100%)`,
       borderLeft: "1px solid rgba(255,255,255,0.06)",
@@ -284,12 +343,79 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
           Wizard
         </span>
         {memories.length > 0 && (
-          <span title={memories.join("\n")} style={{
-            fontSize: 10, color: "rgba(255,255,255,0.15)",
-            cursor: "help",
-          }}>
-            {memories.length} memories
-          </span>
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setShowMemories(!showMemories)}
+              style={{
+                fontSize: 10, color: showMemories ? "rgba(180,138,192,0.6)" : "rgba(255,255,255,0.18)",
+                cursor: "pointer",
+                background: "transparent",
+                border: "none",
+                padding: "2px 6px",
+                borderRadius: 4,
+                transition: "all 0.15s",
+              }}
+            >
+              {memories.length} memories
+            </button>
+            {showMemories && (
+              <div style={{
+                position: "absolute",
+                top: "100%",
+                right: 0,
+                marginTop: 6,
+                width: 280,
+                maxHeight: 300,
+                overflowY: "auto",
+                background: `linear-gradient(180deg, #1a1f2e 0%, ${DARK_INK} 100%)`,
+                borderRadius: 12,
+                padding: "14px 16px",
+                boxShadow: "0 0 0 1px rgba(255,255,255,0.06), 0 12px 32px rgba(0,0,0,0.5)",
+                zIndex: 20,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+                  Wizard Memories
+                </div>
+                {memories.map((m, i) => (
+                  <div key={i} style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 8,
+                    padding: "6px 0",
+                    borderBottom: i < memories.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                  }}>
+                    <span style={{ flex: 1, fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.4 }}>
+                      {m}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const updated = memories.filter((_, j) => j !== i);
+                        updateSettings({ wizardMemories: updated });
+                      }}
+                      title="Forget this"
+                      style={{
+                        width: 18, height: 18, borderRadius: 4,
+                        border: "none", background: "transparent",
+                        color: "rgba(255,255,255,0.12)", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 12, padding: 0, flexShrink: 0,
+                        transition: "color 0.15s",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(220,80,80,0.6)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.12)"; }}
+                    >
+                      {"×"}
+                    </button>
+                  </div>
+                ))}
+                {memories.length === 0 && (
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", fontStyle: "italic" }}>
+                    No memories yet
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
         <button
           onClick={onClose}
@@ -373,6 +499,10 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
           if (r.newCards?.length) actionSummary.push(`${r.newCards.length} card${r.newCards.length > 1 ? "s" : ""}`);
           if (r.dayPlan) actionSummary.push("day plan");
           if (r.highlights?.length) actionSummary.push(`${r.highlights.length} highlight${r.highlights.length > 1 ? "s" : ""}`);
+          if (r.research?.length) actionSummary.push(`${r.research.length} research`);
+          if (r.labels?.length) actionSummary.push(`${r.labels.length} label${r.labels.length > 1 ? "s" : ""}`);
+          if (r.rituals?.length) actionSummary.push(`${r.rituals.length} ritual${r.rituals.length > 1 ? "s" : ""}`);
+          if (r.moveCards?.length) actionSummary.push(`${r.moveCards.length} move${r.moveCards.length > 1 ? "s" : ""}`);
 
           return (
             <div key={i} style={{
@@ -443,6 +573,104 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
                             color: "rgba(200,170,220,0.6)",
                           }}>{est}</span>
                         )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Label assignments */}
+              {r.labels && r.labels.length > 0 && (
+                <div style={{ padding: "0 4px" }}>
+                  {r.labels.map((lbl, j) => {
+                    const cardTitle = board.cards[lbl.cardId]?.title || lbl.cardId;
+                    return (
+                      <div key={j} style={{
+                        fontSize: 12,
+                        color: "rgba(255,255,255,0.5)",
+                        padding: "3px 0",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}>
+                        <span style={{
+                          width: 8, height: 8, borderRadius: 4,
+                          background: CARD_LABELS.find((l) => l.value === lbl.label)?.color || "rgba(255,255,255,0.2)",
+                          flexShrink: 0,
+                        }} />
+                        <span>{cardTitle} → {lbl.label || "none"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Ritual assignments */}
+              {r.rituals && r.rituals.length > 0 && (
+                <div style={{ padding: "0 4px" }}>
+                  {r.rituals.map((rit, j) => {
+                    const cardTitle = board.cards[rit.cardId]?.title || rit.cardId;
+                    const scheduleLabel = !rit.schedule ? "removed"
+                      : rit.schedule === "daily" ? "daily"
+                      : Array.isArray(rit.schedule) && rit.schedule.join(",") === "1,2,3,4,5" ? "weekdays"
+                      : Array.isArray(rit.schedule) ? rit.schedule.map((d) => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]).join(", ")
+                      : String(rit.schedule);
+                    return (
+                      <div key={j} style={{
+                        fontSize: 12,
+                        color: "rgba(255,255,255,0.5)",
+                        padding: "3px 0",
+                        display: "flex",
+                        alignItems: "baseline",
+                        gap: 6,
+                      }}>
+                        <span style={{ color: "rgba(255,255,255,0.3)" }}>{"↻"}</span>
+                        <span>{cardTitle} → {scheduleLabel}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Card moves */}
+              {r.moveCards && r.moveCards.length > 0 && (
+                <div style={{ padding: "0 4px" }}>
+                  {r.moveCards.map((mv, j) => {
+                    const cardTitle = board.cards[mv.cardId]?.title || mv.cardId;
+                    const colName = board.columns.find((c) => c.id === mv.toColumn)?.title || mv.toColumn;
+                    return (
+                      <div key={j} style={{
+                        fontSize: 12,
+                        color: "rgba(255,255,255,0.5)",
+                        padding: "3px 0",
+                        display: "flex",
+                        alignItems: "baseline",
+                        gap: 6,
+                      }}>
+                        <span style={{ color: "rgba(255,255,255,0.3)" }}>{"→"}</span>
+                        <span>{cardTitle} → {colName}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Research jobs */}
+              {r.research && r.research.length > 0 && (
+                <div style={{ padding: "0 4px" }}>
+                  {r.research.map((job, j) => {
+                    const cardTitle = board.cards[job.cardId]?.title || job.cardId;
+                    return (
+                      <div key={j} style={{
+                        fontSize: 12,
+                        color: "rgba(200,170,220,0.7)",
+                        padding: "3px 0",
+                        display: "flex",
+                        alignItems: "baseline",
+                        gap: 6,
+                      }}>
+                        <span style={{ color: "rgba(200,170,220,0.4)" }}>{"✦"}</span>
+                        <span>Research: <strong>{cardTitle}</strong></span>
                       </div>
                     );
                   })}

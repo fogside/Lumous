@@ -210,6 +210,8 @@ export default function App() {
           setTimeEstimates={setTimeEstimates}
           reloadFromDisk={reloadFromDisk}
           updateSettings={updateSettings}
+          startResearch={startResearch}
+          moveCard={moveCard}
         />
       )}
 

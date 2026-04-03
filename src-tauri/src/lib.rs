@@ -102,6 +102,19 @@ fn git_run(app: tauri::AppHandle, args: Vec<String>) -> Result<String, String> {
 
 #[tauri::command]
 async fn run_claude(system_prompt: String, user_prompt: String) -> Result<String, String> {
+    // Build a PATH that includes common CLI install locations
+    // macOS app bundles don't inherit shell PATH, so we must set it explicitly
+    let home = std::env::var("HOME").unwrap_or_default();
+    let extra_paths = [
+        format!("{}/.local/bin", home),
+        format!("{}/.nvm/versions/node/v20/bin", home),  // nvm
+        format!("{}/.cargo/bin", home),
+        "/usr/local/bin".to_string(),
+        "/opt/homebrew/bin".to_string(),
+    ];
+    let sys_path = std::env::var("PATH").unwrap_or_default();
+    let full_path = format!("{}:{}", extra_paths.join(":"), sys_path);
+
     let output = Command::new("claude")
         .arg("-p")
         .arg(&user_prompt)
@@ -111,6 +124,7 @@ async fn run_claude(system_prompt: String, user_prompt: String) -> Result<String
         .arg("text")
         .arg("--model")
         .arg("claude-opus-4-6")
+        .env("PATH", &full_path)
         .output()
         .map_err(|e| format!("Failed to run claude: {}. Is Claude Code installed?", e))?;
 
