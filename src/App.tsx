@@ -43,7 +43,7 @@ export default function App() {
     acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
     reorderColumn, setTimeEstimates, reloadFromDisk,
   } = useBoard(activeBoard, handleBoardChanged);
-  const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings);
+  const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings, reloadFromDisk);
   const { mode } = useWindowSize();
 
   const getCard = useCallback((id: string) => board?.cards[id], [board]);

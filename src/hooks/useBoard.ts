@@ -284,8 +284,18 @@ export function useBoard(
     onBoardChanged?.(board);
 
     clearTimeout(saveTimeout.current);
-    saveTimeout.current = setTimeout(() => {
-      saveBoard(board).catch(console.error);
+    saveTimeout.current = setTimeout(async () => {
+      try {
+        await saveBoard(board);
+        // Update mtime AFTER save completes so polling doesn't reload what we just wrote
+        if (board.id) {
+          try {
+            lastMtimeRef.current = await getBoardMtime(board.id);
+          } catch { /* ignore */ }
+        }
+      } catch (e) {
+        console.error(e);
+      }
       dirtyRef.current = false;
     }, 500);
     return () => clearTimeout(saveTimeout.current);
