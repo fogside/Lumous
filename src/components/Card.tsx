@@ -372,6 +372,12 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
       )}
 
       <span style={{ fontSize: 11, color: theme.textTertiary, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontWeight: 400 }}>
+        {card.research?.status === "running" && (
+          <span style={{ animation: "wizard-spin 1s linear infinite", display: "inline-block", fontSize: 11, color: "rgba(180,138,192,0.6)" }}>{"✦"}</span>
+        )}
+        {card.research?.status === "done" && (
+          <span style={{ fontSize: 11, color: "rgba(180,138,192,0.5)" }}>{"✦"}</span>
+        )}
         {card.timeEstimate && (
           <span style={{
             fontSize: 10,
@@ -417,6 +423,10 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
         @keyframes wizard-pulse {
           0%, 100% { opacity: 0.6; }
           50% { opacity: 1; }
+        }
+        @keyframes wizard-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>

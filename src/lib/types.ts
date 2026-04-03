@@ -41,6 +41,14 @@ export interface Card {
     schedule: RitualSchedule;
   };
   timeEstimate?: string;  // e.g. "15min", "1h", "2h"
+  // Wizard research (background per-card research)
+  research?: {
+    status: "running" | "done" | "error";
+    context?: string;
+    result?: string;
+    error?: string;
+    startedAt?: string;
+  };
   // Wizard proposal fields (set by MCP server)
   proposed?: boolean;
   proposedReasoning?: string;

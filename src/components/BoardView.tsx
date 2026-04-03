@@ -34,6 +34,7 @@ interface Props {
   rejectAllProposals?: () => void;
   clearHighlights?: () => void;
   onOpenMagician?: () => void;
+  onStartResearch?: (card: CardType, context: string) => void;
 }
 
 function EditableTitle({ title, onSave, small, theme }: { title: string; onSave: (t: string) => void; small?: boolean; theme: BoardTheme }) {
@@ -116,7 +117,7 @@ function startWindowDrag(e: React.MouseEvent) {
   getCurrentWindow().startDragging();
 }
 
-export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, onTitleChange, mode = "full", showWisps = true, acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights, onOpenMagician }: Props) {
+export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, onTitleChange, mode = "full", showWisps = true, acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights, onOpenMagician, onStartResearch }: Props) {
   const [editingCard, setEditingCard] = useState<{ card: CardType; columnId: string } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeRect, setActiveRect] = useState<{ width: number; height: number } | null>(null);
@@ -486,12 +487,13 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
 
       {editingCard && (
         <CardModal
-          card={editingCard.card}
+          card={board.cards[editingCard.card.id] || editingCard.card}
           columnId={editingCard.columnId}
           goals={board.goals}
           onSave={updateCard}
           onDelete={deleteCard}
           onClose={() => setEditingCard(null)}
+          onStartResearch={onStartResearch}
         />
       )}
     </div>

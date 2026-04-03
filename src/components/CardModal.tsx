@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, CardLabel, CARD_LABELS, DARK_INK, Goal, RitualSchedule } from "../lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { renderMarkdown } from "../lib/markdown";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -11,9 +12,10 @@ interface Props {
   onSave: (card: Card) => void;
   onDelete: (cardId: string, columnId: string) => void;
   onClose: () => void;
+  onStartResearch?: (card: Card, context: string) => void;
 }
 
-export function CardModal({ card, columnId, goals, onSave, onDelete, onClose }: Props) {
+export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, onStartResearch }: Props) {
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description);
   const [label, setLabel] = useState<CardLabel | undefined>(card.label);
@@ -42,6 +44,11 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose }: 
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  const [researchContext, setResearchContext] = useState("");
+  const [showResearchInput, setShowResearchInput] = useState(false);
+  const hasMarkdown = /[*#\-`|]/.test(card.description);
+  const [descPreview, setDescPreview] = useState(hasMarkdown && card.description.trim().length > 0);
+
   const handleSave = () => {
     if (!title.trim()) return;
     onSave({
@@ -53,8 +60,23 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose }: 
       ritual: ritualEnabled
         ? { schedule: ritualSchedule }
         : undefined,
+      research: card.research?.status === "running" ? card.research : undefined, // clear research on save (content is in description now), keep if still running
     });
     onClose();
+  };
+
+  const handleStartResearch = () => {
+    if (!onStartResearch) return;
+    onStartResearch(card, researchContext || card.title);
+    setShowResearchInput(false);
+    setResearchContext("");
+  };
+
+  const handleApplyResearch = () => {
+    if (!card.research?.result) return;
+    const sep = description.trim() ? "\n\n---\n\n" : "";
+    setDescription(description.trim() + sep + card.research.result);
+    setDescPreview(true);
   };
 
   return (
@@ -114,43 +136,85 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose }: 
         {/* Scrollable content area */}
         <div style={{ flex: 1, overflowY: "auto", padding: "0 26px 20px 26px" }}>
 
-          {/* Description — auto-grows with content */}
+          {/* Description — edit / preview toggle */}
           <div style={{ marginTop: 16 }}>
-            <textarea
-              value={description}
-              onChange={(e) => {
-                setDescription(e.target.value);
-                // Auto-resize
-                e.target.style.height = "auto";
-                e.target.style.height = e.target.scrollHeight + "px";
-              }}
-              ref={(el) => {
-                // Set initial height based on content
-                if (el) {
-                  el.style.height = "auto";
-                  el.style.height = Math.max(el.scrollHeight, 80) + "px";
-                }
-              }}
-              placeholder="Add a description..."
-              style={{
-                width: "100%",
-                minHeight: 80,
-                maxHeight: 240,
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.05)",
-                borderRadius: 10,
-                padding: "12px 14px",
-                fontSize: 15,
-                color: "rgba(255,255,255,0.75)",
-                outline: "none",
-                resize: "none",
-                lineHeight: 1.6,
-                transition: "border-color 0.15s",
-                overflow: "auto",
-              }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)"; }}
-            />
+            {/[*#\-`|]/.test(description) && description.trim() && (
+              <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+                <button
+                  onClick={() => setDescPreview(false)}
+                  style={{
+                    padding: "3px 10px", borderRadius: 5, fontSize: 11, fontWeight: 600,
+                    background: !descPreview ? "rgba(255,255,255,0.08)" : "transparent",
+                    border: "none", color: !descPreview ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.2)",
+                    cursor: "pointer", transition: "all 0.15s",
+                  }}
+                >Edit</button>
+                <button
+                  onClick={() => setDescPreview(true)}
+                  style={{
+                    padding: "3px 10px", borderRadius: 5, fontSize: 11, fontWeight: 600,
+                    background: descPreview ? "rgba(255,255,255,0.08)" : "transparent",
+                    border: "none", color: descPreview ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.2)",
+                    cursor: "pointer", transition: "all 0.15s",
+                  }}
+                >Preview</button>
+              </div>
+            )}
+
+            {descPreview && description.trim() ? (
+              <div
+                onClick={() => setDescPreview(false)}
+                style={{
+                  minHeight: 80,
+                  maxHeight: 300,
+                  overflowY: "auto",
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.05)",
+                  fontSize: 14,
+                  color: "rgba(255,255,255,0.75)",
+                  lineHeight: 1.6,
+                  cursor: "text",
+                }}
+              >
+                {renderMarkdown(description)}
+              </div>
+            ) : (
+              <textarea
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
+                ref={(el) => {
+                  if (el) {
+                    el.style.height = "auto";
+                    el.style.height = Math.max(el.scrollHeight, 80) + "px";
+                  }
+                }}
+                placeholder="Add a description..."
+                style={{
+                  width: "100%",
+                  minHeight: 80,
+                  maxHeight: 240,
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.05)",
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  fontSize: 15,
+                  color: "rgba(255,255,255,0.75)",
+                  outline: "none",
+                  resize: "none",
+                  lineHeight: 1.6,
+                  transition: "border-color 0.15s",
+                  overflow: "auto",
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)"; }}
+              />
+            )}
           </div>
 
           {/* Label */}
@@ -320,6 +384,150 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose }: 
               </div>
             </div>
           )}
+          {/* Research */}
+          {onStartResearch && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8, marginBottom: 8,
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.22)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                  {"🧙"} Research
+                </span>
+                {card.research?.status === "running" && (
+                  <span style={{ fontSize: 11, color: "rgba(180,138,192,0.5)", fontStyle: "italic" }}>
+                    <span style={{ animation: "wizard-spin 1s linear infinite", display: "inline-block", marginRight: 4 }}>{"✦"}</span>
+                    Researching...
+                  </span>
+                )}
+              </div>
+
+              {/* Research results */}
+              {card.research?.status === "done" && card.research.result && (
+                <div style={{
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  background: "rgba(180,138,192,0.04)",
+                  border: "1px solid rgba(180,138,192,0.08)",
+                  marginBottom: 10,
+                  fontSize: 13,
+                  color: "rgba(255,255,255,0.75)",
+                  lineHeight: 1.55,
+                  maxHeight: 240,
+                  overflowY: "auto",
+                }}>
+                  {renderMarkdown(card.research.result)}
+                </div>
+              )}
+
+              {/* Error */}
+              {card.research?.status === "error" && (
+                <div style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  background: "rgba(220,80,80,0.06)",
+                  color: "rgba(220,120,120,0.7)",
+                  fontSize: 12,
+                  marginBottom: 10,
+                  lineHeight: 1.5,
+                }}>
+                  {card.research.error || "Research failed"}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {card.research?.status === "done" && (
+                  <>
+                    <button
+                      onClick={handleApplyResearch}
+                      style={{
+                        padding: "6px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600,
+                        background: "rgba(180,138,192,0.1)", border: "none",
+                        color: "rgba(200,170,220,0.8)", cursor: "pointer", transition: "all 0.15s",
+                      }}
+                    >
+                      Apply to description
+                    </button>
+                    <button
+                      onClick={() => setShowResearchInput(true)}
+                      style={{
+                        padding: "6px 14px", borderRadius: 7, fontSize: 12, fontWeight: 500,
+                        background: "transparent", border: "none",
+                        color: "rgba(255,255,255,0.3)", cursor: "pointer", transition: "all 0.15s",
+                      }}
+                    >
+                      Refine
+                    </button>
+                  </>
+                )}
+
+                {(card.research?.status === "error" || (!card.research && !showResearchInput)) && (
+                  <button
+                    onClick={() => setShowResearchInput(true)}
+                    style={{
+                      padding: "6px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600,
+                      background: "rgba(180,138,192,0.08)", border: "none",
+                      color: "rgba(200,170,220,0.6)", cursor: "pointer", transition: "all 0.15s",
+                      display: "flex", alignItems: "center", gap: 5,
+                    }}
+                  >
+                    {"✦"} {card.research?.status === "error" ? "Retry" : "Start research"}
+                  </button>
+                )}
+              </div>
+
+              {/* Research context input */}
+              {showResearchInput && card.research?.status !== "running" && (
+                <div style={{ marginTop: 8 }}>
+                  <textarea
+                    value={researchContext}
+                    onChange={(e) => setResearchContext(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && e.metaKey) { e.preventDefault(); handleStartResearch(); }
+                    }}
+                    placeholder={`What should I research about "${card.title}"?`}
+                    rows={2}
+                    style={{
+                      width: "100%",
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 8,
+                      padding: "10px 12px",
+                      fontSize: 13,
+                      color: "rgba(255,255,255,0.75)",
+                      outline: "none",
+                      resize: "none",
+                      lineHeight: 1.5,
+                      fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
+                    }}
+                  />
+                  <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                    <button
+                      onClick={handleStartResearch}
+                      style={{
+                        padding: "6px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600,
+                        background: "rgba(180,138,192,0.12)", border: "none",
+                        color: "rgba(200,170,220,0.8)", cursor: "pointer",
+                        display: "flex", alignItems: "center", gap: 5,
+                      }}
+                    >
+                      {"🧙"} Research
+                    </button>
+                    <button
+                      onClick={() => { setShowResearchInput(false); setResearchContext(""); }}
+                      style={{
+                        padding: "6px 14px", borderRadius: 7, fontSize: 12, fontWeight: 500,
+                        background: "transparent", border: "none",
+                        color: "rgba(255,255,255,0.25)", cursor: "pointer",
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer bar */}
@@ -382,6 +590,13 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose }: 
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes wizard-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
 
       {showDeleteConfirm && (
         <ConfirmDialog

@@ -6,6 +6,7 @@ import { useBoard } from "./hooks/useBoard";
 import { useSync } from "./hooks/useSync";
 import { saveBoard } from "./lib/storage";
 import { useWindowSize } from "./hooks/useWindowSize";
+import { useCardResearch } from "./hooks/useCardResearch";
 import { Board } from "./lib/types";
 import { Sidebar } from "./components/Sidebar";
 import { BoardView } from "./components/BoardView";
@@ -44,6 +45,10 @@ export default function App() {
   } = useBoard(activeBoard, handleBoardChanged);
   const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings);
   const { mode } = useWindowSize();
+
+  const getCard = useCallback((id: string) => board?.cards[id], [board]);
+  const getMemories = useCallback(() => meta?.settings.wizardMemories || [], [meta]);
+  const { startResearch } = useCardResearch(updateCard, getCard, getMemories);
 
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [showNewBoard, setShowNewBoard] = useState(false);
@@ -149,6 +154,7 @@ export default function App() {
               rejectAllProposals={rejectAllProposals}
               clearHighlights={clearHighlights}
               onOpenMagician={() => setShowWizard((v) => !v)}
+              onStartResearch={startResearch}
             />
           )
         ) : (

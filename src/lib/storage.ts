@@ -24,6 +24,14 @@ export async function loadBoard(id: string): Promise<Board> {
       migrated = true;
     }
   }
+  // Reset stale research: if app was closed during research, mark as error
+  for (const card of Object.values(board.cards)) {
+    if (card.research?.status === "running") {
+      card.research = { ...card.research, status: "error", error: "Interrupted — try again" };
+      migrated = true;
+    }
+  }
+
   if (migrated) {
     // Persist the migration so it only runs once
     await invoke("save_board", {
