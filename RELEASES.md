@@ -1,5 +1,21 @@
 # Releases
 
+## v1.8.1 — Stability Fixes
+
+*2026-04-03*
+
+- **Fix completed cards reappearing** — race condition between auto-save debounce and file polling caused completed cards to revert. Save now awaits disk write before clearing dirty flag
+- **Fix board not reloading after sync** — git pull now triggers a board reload so synced changes appear immediately
+- **Fix macOS network volume prompt** — wizard sets working directory to $HOME when spawning claude CLI
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v1.8.0 — Wizard Research & Full Board Control
 
 *2026-04-03*
