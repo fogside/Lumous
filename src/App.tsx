@@ -41,9 +41,9 @@ export default function App() {
   const {
     board, moveCard, addCard, updateCard, deleteCard, setGoals,
     acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
-    reorderColumn, setTimeEstimates, flushSave, reloadFromDisk,
+    reorderColumn, setTimeEstimates, flushSave, forceResave, reloadFromDisk,
   } = useBoard(activeBoard, handleBoardChanged);
-  const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings, reloadFromDisk, flushSave);
+  const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings, reloadFromDisk, flushSave, forceResave);
   const { mode } = useWindowSize();
 
   const getCard = useCallback((id: string) => board?.cards[id], [board]);
@@ -212,6 +212,7 @@ export default function App() {
           updateSettings={updateSettings}
           startResearch={startResearch}
           moveCard={moveCard}
+          flushSave={flushSave}
         />
       )}
 

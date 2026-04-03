@@ -414,6 +414,19 @@ export function useBoard(
     }
   }, []);
 
+  // Force-write current board state to disk unconditionally (used after sync strips transient data)
+  const forceResave = useCallback(async () => {
+    if (!boardRef.current) return;
+    try {
+      await saveBoard(boardRef.current);
+      if (boardRef.current.id) {
+        lastMtimeRef.current = await getBoardMtime(boardRef.current.id);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   // Force reload board from disk (e.g., after MagicianModal writes proposed cards)
   const reloadFromDisk = useCallback(async () => {
     const boardId = initialBoard?.id;
@@ -433,6 +446,6 @@ export function useBoard(
   return {
     board, dispatch, moveCard, addCard, updateCard, deleteCard, setGoals,
     acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
-    reorderColumn, setTimeEstimates, flushSave, reloadFromDisk,
+    reorderColumn, setTimeEstimates, flushSave, forceResave, reloadFromDisk,
   };
 }

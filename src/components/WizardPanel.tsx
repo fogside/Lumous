@@ -40,6 +40,7 @@ interface Props {
   updateSettings: (settings: Partial<Meta["settings"]>) => void;
   startResearch: (card: Card, context: string) => void;
   moveCard: (cardId: string, fromCol: string, toCol: string, toIndex: number) => void;
+  flushSave: () => Promise<void>;
 }
 
 // ─── Board serializer ───────────────────────────────────────────
@@ -116,7 +117,7 @@ Rules:
 
 // ─── Component ──────────────────────────────────────────────────
 
-export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, setTimeEstimates, reloadFromDisk, updateSettings, startResearch, moveCard }: Props) {
+export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, setTimeEstimates, reloadFromDisk, updateSettings, startResearch, moveCard, flushSave }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -125,8 +126,19 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
 
   const memories = meta?.settings.wizardMemories || [];
   const [showMemories, setShowMemories] = useState(false);
+  const boardIdRef = useRef(board.id);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  // Clear chat when board changes (prevent applying actions to wrong board)
+  useEffect(() => {
+    if (board.id !== boardIdRef.current) {
+      boardIdRef.current = board.id;
+      setMessages([]);
+      setInput("");
+      setLoading(false);
+    }
+  }, [board.id]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -213,6 +225,9 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
     const r = msg.response;
 
     try {
+      // Flush pending saves so disk has the latest user changes before we modify
+      await flushSave();
+
       // Apply ALL actions atomically via one disk write + one reload
       // This prevents polling from wiping in-flight reducer changes
       const boardData = JSON.parse(await invoke<string>("load_board", { id: board.id }));
@@ -270,38 +285,44 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
         }
       }
 
-      // Step 4: Labels
+      // Step 4: Labels (map NEW_X → real IDs)
       if (r.labels?.length) {
         for (const lbl of r.labels) {
-          if (boardData.cards[lbl.cardId]) {
+          const realId = idMap[lbl.cardId] || lbl.cardId;
+          if (boardData.cards[realId]) {
             const labelValue = lbl.label === "null" || !lbl.label ? null : lbl.label;
-            boardData.cards[lbl.cardId].label = labelValue;
+            boardData.cards[realId].label = labelValue;
           }
         }
       }
 
-      // Step 5: Rituals
+      // Step 5: Rituals (map NEW_X → real IDs)
       if (r.rituals?.length) {
         for (const rit of r.rituals) {
-          if (boardData.cards[rit.cardId]) {
-            boardData.cards[rit.cardId].ritual = rit.schedule ? { schedule: rit.schedule } : undefined;
+          const realId = idMap[rit.cardId] || rit.cardId;
+          if (boardData.cards[realId]) {
+            boardData.cards[realId].ritual = rit.schedule ? { schedule: rit.schedule } : undefined;
           }
         }
       }
 
-      // Step 6: Move cards between columns
+      // Step 6: Move cards between columns (map NEW_X → real IDs)
       if (r.moveCards?.length) {
         for (const mv of r.moveCards) {
-          const fromCol = boardData.columns.find((c: { id: string; cardIds: string[] }) => c.cardIds.includes(mv.cardId));
+          const realId = idMap[mv.cardId] || mv.cardId;
+          const fromCol = boardData.columns.find((c: { id: string; cardIds: string[] }) => c.cardIds.includes(realId));
           const toCol = boardData.columns.find((c: { id: string }) => c.id === mv.toColumn);
           if (fromCol && toCol && fromCol.id !== toCol.id) {
-            fromCol.cardIds = fromCol.cardIds.filter((id: string) => id !== mv.cardId);
-            toCol.cardIds.unshift(mv.cardId);
-            // Set completedAt when moving to completed
-            if (mv.toColumn === "completed" && boardData.cards[mv.cardId]) {
-              boardData.cards[mv.cardId].completedAt = new Date().toISOString();
-            } else if (fromCol.id === "completed" && boardData.cards[mv.cardId]) {
-              boardData.cards[mv.cardId].completedAt = null;
+            fromCol.cardIds = fromCol.cardIds.filter((id: string) => id !== realId);
+            toCol.cardIds.unshift(realId);
+            // Set completedAt when moving to completed + update completionLog
+            if (mv.toColumn === "completed" && boardData.cards[realId]) {
+              const now = new Date().toISOString();
+              boardData.cards[realId].completedAt = now;
+              if (!boardData.completionLog) boardData.completionLog = [];
+              boardData.completionLog.push(now);
+            } else if (fromCol.id === "completed" && boardData.cards[realId]) {
+              boardData.cards[realId].completedAt = null;
             }
           }
         }

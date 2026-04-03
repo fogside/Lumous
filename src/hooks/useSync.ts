@@ -9,6 +9,7 @@ export function useSync(
   updateSettings: (settings: Partial<Meta["settings"]>) => Promise<void>,
   onSynced?: () => void,
   flushSave?: () => Promise<void>,
+  forceResave?: () => Promise<void>,
 ) {
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [syncError, setSyncError] = useState<string>("");
@@ -64,9 +65,9 @@ export function useSync(
       await gitRun(["push", "-u", "origin", "main"]);
 
       // Restore in-memory board state to disk (re-applies any active proposals/highlights
-      // that were stripped before git commit). flushSave writes boardRef.current which
-      // still has the full transient state.
-      if (flushSave) await flushSave();
+      // that were stripped before git commit). We call forceResave which writes
+      // unconditionally, unlike flushSave which checks dirtyRef.
+      if (forceResave) await forceResave();
 
       await updateSettings({ lastSyncedAt: new Date().toISOString() });
       setSyncState("success");
@@ -79,7 +80,7 @@ export function useSync(
       setSyncState("error");
       setTimeout(() => setSyncState("idle"), 5000);
     }
-  }, [repoUrl, updateSettings, onSynced, flushSave]);
+  }, [repoUrl, updateSettings, onSynced, flushSave, forceResave]);
 
   // Auto-sync interval — visibility-aware to avoid firing immediately on wake
   useEffect(() => {
