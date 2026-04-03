@@ -205,11 +205,13 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
     const r = msg.response;
 
     try {
+      // Apply ALL actions atomically via one disk write + one reload
+      // This prevents polling from wiping in-flight reducer changes
+      const boardData = JSON.parse(await invoke<string>("load_board", { id: board.id }));
       const idMap: Record<string, string> = {};
 
+      // Step 1: Create new cards
       if (r.newCards?.length) {
-        const boardData = JSON.parse(await invoke<string>("load_board", { id: board.id }));
-
         for (let i = 0; i < r.newCards.length; i++) {
           const nc = r.newCards[i];
           const col = boardData.columns.find((c: { id: string }) => c.id === nc.columnId);
@@ -229,84 +231,87 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
           };
           col.cardIds.unshift(realId);
         }
+      }
 
-        if (r.highlights?.length) {
-          for (const h of r.highlights) {
-            if (boardData.cards[h.cardId]) {
-              boardData.cards[h.cardId].highlighted = true;
-              boardData.cards[h.cardId].highlightReason = h.reason;
-            }
-          }
-        }
-
-        await invoke("save_board", { id: board.id, data: JSON.stringify(boardData, null, 2) });
-        reloadFromDisk();
-      } else if (r.highlights?.length) {
-        const boardData = JSON.parse(await invoke<string>("load_board", { id: board.id }));
+      // Step 2: Highlights
+      if (r.highlights?.length) {
         for (const h of r.highlights) {
           if (boardData.cards[h.cardId]) {
             boardData.cards[h.cardId].highlighted = true;
             boardData.cards[h.cardId].highlightReason = h.reason;
           }
         }
-        await invoke("save_board", { id: board.id, data: JSON.stringify(boardData, null, 2) });
-        reloadFromDisk();
       }
 
+      // Step 3: Day plan (reorder + time estimates)
       if (r.dayPlan) {
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        const mappedOrder = r.dayPlan.order.map((id) => idMap[id] || id);
-        reorderColumn(r.dayPlan.columnId, mappedOrder);
-
+        const col = boardData.columns.find((c: { id: string }) => c.id === r.dayPlan!.columnId);
+        if (col) {
+          const mappedOrder = r.dayPlan.order.map((id: string) => idMap[id] || id);
+          const validIds = mappedOrder.filter((id: string) => boardData.cards[id]);
+          const remaining = col.cardIds.filter((id: string) => !validIds.includes(id));
+          col.cardIds = [...validIds, ...remaining];
+        }
         if (r.dayPlan.timeEstimates) {
-          const mappedEstimates: Record<string, string> = {};
           for (const [id, est] of Object.entries(r.dayPlan.timeEstimates)) {
-            mappedEstimates[idMap[id] || id] = est;
+            const realId = idMap[id] || id;
+            if (boardData.cards[realId]) {
+              boardData.cards[realId].timeEstimate = est;
+            }
           }
-          setTimeEstimates(mappedEstimates);
         }
       }
 
-      // Step 3: Apply labels to cards
+      // Step 4: Labels
       if (r.labels?.length) {
         for (const lbl of r.labels) {
-          const card = board.cards[lbl.cardId];
-          if (card) {
-            const labelValue = lbl.label === "null" || !lbl.label ? undefined : lbl.label;
-            updateCard({ ...card, label: labelValue as Card["label"] });
+          if (boardData.cards[lbl.cardId]) {
+            const labelValue = lbl.label === "null" || !lbl.label ? null : lbl.label;
+            boardData.cards[lbl.cardId].label = labelValue;
           }
         }
       }
 
-      // Step 4: Set ritual schedules on cards
+      // Step 5: Rituals
       if (r.rituals?.length) {
         for (const rit of r.rituals) {
-          const card = board.cards[rit.cardId];
-          if (card) {
-            updateCard({
-              ...card,
-              ritual: rit.schedule ? { schedule: rit.schedule } : undefined,
-            });
+          if (boardData.cards[rit.cardId]) {
+            boardData.cards[rit.cardId].ritual = rit.schedule ? { schedule: rit.schedule } : undefined;
           }
         }
       }
 
-      // Step 5: Move cards between columns
+      // Step 6: Move cards between columns
       if (r.moveCards?.length) {
         for (const mv of r.moveCards) {
-          const fromCol = board.columns.find((c) => c.cardIds.includes(mv.cardId));
-          if (fromCol && fromCol.id !== mv.toColumn) {
-            moveCard(mv.cardId, fromCol.id, mv.toColumn, 0);
+          const fromCol = boardData.columns.find((c: { id: string; cardIds: string[] }) => c.cardIds.includes(mv.cardId));
+          const toCol = boardData.columns.find((c: { id: string }) => c.id === mv.toColumn);
+          if (fromCol && toCol && fromCol.id !== toCol.id) {
+            fromCol.cardIds = fromCol.cardIds.filter((id: string) => id !== mv.cardId);
+            toCol.cardIds.unshift(mv.cardId);
+            // Set completedAt when moving to completed
+            if (mv.toColumn === "completed" && boardData.cards[mv.cardId]) {
+              boardData.cards[mv.cardId].completedAt = new Date().toISOString();
+            } else if (fromCol.id === "completed" && boardData.cards[mv.cardId]) {
+              boardData.cards[mv.cardId].completedAt = null;
+            }
           }
         }
       }
 
-      // Step 6: Trigger background research on specified cards
+      // One atomic write + one reload
+      await invoke("save_board", { id: board.id, data: JSON.stringify(boardData, null, 2) });
+      reloadFromDisk();
+
+      // Step 7: Trigger background research (after reload, uses latest card state)
       if (r.research?.length) {
-        for (const job of r.research) {
-          const card = board.cards[job.cardId];
-          if (card) startResearch(card, job.context);
-        }
+        // Small delay for reload to settle
+        setTimeout(() => {
+          for (const job of r.research!) {
+            const card = board.cards[job.cardId];
+            if (card) startResearch(card, job.context);
+          }
+        }, 500);
       }
 
       setMessages((prev) =>
