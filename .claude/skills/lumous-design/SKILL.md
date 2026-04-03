@@ -197,10 +197,58 @@ useBoard reducer → onBoardChanged → refreshBoard → new initialBoard → SE
 - If adding a new dispatch (like SPAWN_RITUALS), ensure it returns `state` (same reference) when there's nothing to change — otherwise it will trigger the save effect
 - The save effect's `board === lastSetBoardRef.current` check relies on reference equality; `suppressSaveRef` is the backup when that check fails due to React's effect ordering
 
+## Data Consistency: The Save/Poll/Sync Triangle
+
+The app has three async systems that read/write board JSON files. Getting them wrong causes data loss. Every new feature must respect these rules.
+
+### The three writers
+1. **Debounced save** (`useBoard.ts`): 500ms after any reducer change, writes `boardRef.current` to disk. Sets `dirtyRef = false` only AFTER the async `saveBoard()` completes.
+2. **File polling** (`useBoard.ts`): Every 2.5s, checks file mtime. Skips reload if `dirtyRef.current` is true. Dispatches `SET_BOARD` to replace entire reducer state.
+3. **Git sync** (`useSync.ts`): `flushSave()` → `stripWizardTransient()` → `git add/commit/pull/push` → `forceResave()` → `reloadFromDisk()`.
+
+### Rules for new code that modifies board state
+
+**Rule 1: Never write to disk and dispatch to reducer separately.** If you need to modify the board (e.g., wizard actions), do ONE atomic disk write containing ALL changes, then call `reloadFromDisk()` once. Don't mix disk writes with reducer dispatches — polling will reload the disk version and wipe the reducer changes.
+
+**Rule 2: Always flush before loading.** Before loading a board from disk (e.g., in `applyActions`), call `flushSave()` first. Otherwise you'll load stale data that doesn't include the user's recent edits (which are in the reducer but not yet on disk due to the 500ms debounce).
+
+**Rule 3: `dirtyRef` must stay true until save completes.** The debounced save uses `await saveBoard()` and only clears `dirtyRef` after the await. Never clear it synchronously before the async write — polling will reload the old file.
+
+**Rule 4: Update `lastMtimeRef` after every write.** After `saveBoard()`, `flushSave()`, `forceResave()`, and `reloadFromDisk()`, always update `lastMtimeRef` with the new file mtime. This prevents polling from reloading what you just wrote.
+
+**Rule 5: Guard concurrent operations.** Use refs (not state) for concurrency guards since state is batched. See `syncingRef` in useSync.ts and `applyingRef` in WizardPanel.tsx.
+
+**Rule 6: `SET_BOARD` replaces everything.** It nukes all in-flight reducer changes. Only dispatch it after flushing pending saves. `reloadFromDisk()` does this automatically.
+
+### Rules for modals that edit cards
+
+**Rule 7: CardModal uses local state for editable fields.** `useState(card.title)` etc. only initializes on mount. If the card prop changes externally (wizard sets labels, research completes), the modal won't see it unless you add sync logic. Use `userEditedRef` to track which fields the user touched — sync unedited fields from the prop, preserve edited ones.
+
+**Rule 8: Pass live card to modals.** BoardView must pass `board.cards[editingCard.card.id]` (live from reducer), not the snapshot captured at click time. Otherwise the modal never sees external updates.
+
+### Rules for wizard actions
+
+**Rule 9: Map NEW_X placeholder IDs for ALL action types.** When the wizard creates new cards and references them in other actions (dayPlan, labels, rituals, moveCards, research), the `idMap` must be applied to resolve `NEW_X` → real UUID. Missing this causes silent failures.
+
+**Rule 10: Wizard-transient data is local-only.** `proposed`, `proposedReasoning`, `highlighted`, `highlightReason` must never be committed to git. `strip_wizard_transient` (Rust) removes them before `git add`. After git push, `forceResave()` restores them from the in-memory reducer state.
+
+**Rule 11: Update all logs when moving cards.** Moving to "completed" must set `completedAt`, append to `completionLog`, and append to `ritualLog` (if the card has a ritual). The reducer's `MOVE_CARD` does this, but direct disk writes (wizard `applyActions`) must replicate it.
+
+### Rules for MCP server / external writers
+
+**Rule 12: External writes are detected via mtime polling.** The MCP server writes directly to board JSON files. The app detects changes every 2.5s via mtime check. If `dirtyRef` is true (user has unsaved edits), polling skips — the user's next save will overwrite MCP changes. This is by design (local-wins), but means MCP writes can be lost if the user is actively editing.
+
+### Rules for sync
+
+**Rule 13: Sync must flush before committing.** `flushSave()` ensures all pending reducer changes reach disk before `git add -A` stages files.
+
+**Rule 14: Sync must restore transient state after push.** `stripWizardTransient` removes proposals/highlights from disk for the commit. `forceResave()` writes the full reducer state (including transient data) back to disk after push completes.
+
 ## Checklist for New Components
 
-Before shipping any visual change:
+Before shipping any change:
 
+**Visual:**
 1. Does it use `getBoardTheme()` tokens (not hardcoded rgba)?
 2. Does it work on both light and dark boards?
 3. Are there any thick colored borders? (Remove them)
@@ -210,4 +258,14 @@ Before shipping any visual change:
 7. Are all styles inline (no Tailwind classes)?
 8. Does it feel light and subtle, or heavy and corporate? If heavy, dial back.
 9. Do destructive actions on substantial items (boards, goals) show a confirmation dialog?
+
+**Data consistency:**
 10. Do new dispatches or effects in `useBoard` avoid triggering the save→refresh→SET_BOARD loop?
+11. Does any code that writes to disk also update `lastMtimeRef`? (Rule 4)
+12. Does any code that loads from disk call `flushSave()` first? (Rule 2)
+13. Are disk writes and reducer dispatches combined into one atomic operation? (Rule 1)
+14. Do modals pass the live card from `board.cards[id]`, not a snapshot? (Rule 8)
+15. Do modal local states sync from props for externally-changeable fields? (Rule 7)
+16. Do wizard actions map `NEW_X` IDs via `idMap` for ALL action types? (Rule 9)
+17. Does moving cards to "completed" update `completedAt`, `completionLog`, AND `ritualLog`? (Rule 11)
+18. Are concurrent async operations guarded with refs? (Rule 5)
