@@ -1,5 +1,22 @@
 # Releases
 
+## v1.8.2 — Sync Reliability
+
+*2026-04-03*
+
+- **Wizard proposals never committed to git** — proposed cards and highlights are stripped before sync. Only accepted cards persist in git
+- **Flush saves before sync** — pending board changes are written to disk before git commit, preventing stale data from being committed
+- **Highlights cleared on load** — transient wizard markers don't persist across sessions
+- **Wizard memories still synced** — preferences saved via "remember that..." are committed in meta.json
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v1.8.1 — Stability Fixes
 
 *2026-04-03*
