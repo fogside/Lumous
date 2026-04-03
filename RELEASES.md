@@ -1,5 +1,27 @@
 # Releases
 
+## v1.9.0 — Wizard Full Board Control & Stability
+
+*2026-04-03*
+
+- **Wizard labels** — assign color labels (moon crescents) to cards via chat
+- **Wizard rituals** — make cards recurring (daily, weekdays, custom days) via chat
+- **Wizard card moves** — tell the wizard you finished tasks, it moves them to Completed
+- **Wizard memories popover** — click "N memories" to view and delete saved preferences
+- **Per-card research** — wizard researches any card in background, results as rendered markdown with Apply to description
+- **Markdown descriptions** — card descriptions render markdown with Edit/Preview toggle, tables, headers, lists
+- **15 bug fixes across 5 audit passes** — race conditions in save/poll/sync, data consistency in CardModal, wizard apply atomicity, git sync stripping transient state, concurrent sync guard, double-apply guard, and more
+- **Production PATH fix** — wizard works in installed app
+- **Updated README** — documents wizard features and git sync data tracking
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v1.8.2 — Sync Reliability
 
 *2026-04-03*
