@@ -14,12 +14,14 @@ export function useSync(
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [syncError, setSyncError] = useState<string>("");
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const syncingRef = useRef(false);
 
   const repoUrl = meta?.settings.syncRepoUrl || "";
   const intervalMinutes = meta?.settings.syncIntervalMinutes || 5;
 
   const sync = useCallback(async () => {
-    if (!repoUrl) return;
+    if (!repoUrl || syncingRef.current) return;
+    syncingRef.current = true;
     setSyncState("syncing");
     setSyncError("");
 
@@ -79,6 +81,8 @@ export function useSync(
       setSyncError(String(err));
       setSyncState("error");
       setTimeout(() => setSyncState("idle"), 5000);
+    } finally {
+      syncingRef.current = false;
     }
   }, [repoUrl, updateSettings, onSynced, flushSave, forceResave]);
 

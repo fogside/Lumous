@@ -25,18 +25,14 @@ export async function loadBoard(id: string): Promise<Board> {
     }
   }
   // Reset stale research: if app was closed during research, mark as error
-  // Clear highlights: they're transient wizard markers, not meant to persist across sessions
   for (const card of Object.values(board.cards)) {
     if (card.research?.status === "running") {
       card.research = { ...card.research, status: "error", error: "Interrupted — try again" };
       migrated = true;
     }
-    if (card.highlighted) {
-      delete card.highlighted;
-      delete card.highlightReason;
-      migrated = true;
-    }
   }
+  // Note: highlights are NOT cleared on load — they're cleared by strip_wizard_transient
+  // before git sync, and by user action (dismiss). Clearing here would race with applyActions.
 
   if (migrated) {
     // Persist the migration so it only runs once

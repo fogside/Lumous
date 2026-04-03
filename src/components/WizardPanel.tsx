@@ -219,9 +219,12 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
     return !!(r.newCards?.length || r.dayPlan || r.highlights?.length || r.research?.length || r.labels?.length || r.rituals?.length || r.moveCards?.length);
   };
 
+  const applyingRef = useRef(false);
   const applyActions = async (msgIndex: number) => {
+    if (applyingRef.current) return; // prevent double-click
     const msg = messages[msgIndex];
     if (msg.role !== "wizard") return;
+    applyingRef.current = true;
     const r = msg.response;
 
     try {
@@ -347,6 +350,8 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
       );
     } catch (e) {
       setMessages((prev) => [...prev, { role: "system", text: `Failed to apply: ${e}` }]);
+    } finally {
+      applyingRef.current = false;
     }
   };
 
