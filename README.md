@@ -28,7 +28,11 @@ Lumous is a native macOS desktop app for managing tasks across Kanban boards. Fa
 - **Celebrations** — golden sparkles on drag, wizard celebration when completing tasks
 - **Auto-update** — checks for new versions on launch, one-click update from within the app
 - **Offline-first** — works without internet, always
-- **GitHub sync** — optional push/pull to a repo with one click
+- **Wizard planning assistant** — side chat panel powered by Claude (Opus 4.6 via Pro Max). Plans your day, suggests cards, reorders priorities with time estimates, assigns labels, sets recurring schedules, moves cards, and researches tasks in the background
+- **Wizard memory** — say "remember that..." and the wizard saves preferences across all boards and sessions
+- **Per-card research** — wizard researches any card in the background, populates description with markdown findings
+- **MCP server** — Claude Code can read and modify boards via MCP tools (Pencil.dev pattern)
+- **GitHub sync** — optional push/pull to a private repo with one click
 - **Tiny footprint** — ~5MB native binary, instant launch
 - **Frameless beauty** — custom dark UI, no system chrome
 
@@ -41,6 +45,24 @@ curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.t
 That's it. No dependencies, no Homebrew, no account. Data is stored locally in `~/Library/Application Support/io.github.fogside.lumous/`. The app updates itself — click the version number in the sidebar to check.
 
 > **Why not a `.dmg`?** macOS quarantines files downloaded through browsers, which causes unsigned apps to be flagged as "damaged". Installing via `curl` skips Gatekeeper entirely.
+
+### GitHub Sync — What's Tracked
+
+When GitHub sync is enabled, the following data is committed to your private repo:
+
+| Synced to git | Local-only (never committed) |
+|---|---|
+| Card titles & descriptions | Wizard proposed cards (until accepted) |
+| Card order within columns | Highlighted card markers |
+| Color labels (moon crescents) | Research in-progress state |
+| Goals & goal assignments | |
+| Recurring schedules (rituals) | |
+| Time estimates | |
+| Completion timestamps | |
+| Board titles & colors | |
+| Wizard memories & preferences | |
+
+Wizard proposals and highlights are stripped from board files before every git commit. Once you accept a proposed card, it becomes a normal card and syncs normally. Wizard memories (saved via "remember that...") are stored in `meta.json` and always synced.
 
 ### Stack
 
