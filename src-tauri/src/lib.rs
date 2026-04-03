@@ -125,6 +125,7 @@ async fn run_claude(system_prompt: String, user_prompt: String) -> Result<String
         .arg("--model")
         .arg("claude-opus-4-6")
         .env("PATH", &full_path)
+        .current_dir(&home) // avoid network volume prompts from cwd
         .output()
         .map_err(|e| format!("Failed to run claude: {}. Is Claude Code installed?", e))?;
 
