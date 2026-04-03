@@ -139,9 +139,17 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
   }, [messages, loading]);
 
   const saveMemories = async (newMemories: string[]) => {
-    const existing = memories;
-    const merged = [...existing, ...newMemories.filter((m) => !existing.includes(m))];
-    updateSettings({ wizardMemories: merged });
+    // Read fresh from meta to avoid stale closure when multiple remember responses arrive
+    try {
+      const freshMeta = await loadMeta();
+      const existing = freshMeta.settings.wizardMemories || [];
+      const merged = [...existing, ...newMemories.filter((m) => !existing.includes(m))];
+      updateSettings({ wizardMemories: merged });
+    } catch {
+      // Fallback to prop-based memories
+      const merged = [...memories, ...newMemories.filter((m) => !memories.includes(m))];
+      updateSettings({ wizardMemories: merged });
+    }
   };
 
   const sendMessage = async () => {
@@ -303,15 +311,14 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
       await invoke("save_board", { id: board.id, data: JSON.stringify(boardData, null, 2) });
       reloadFromDisk();
 
-      // Step 7: Trigger background research (after reload, uses latest card state)
+      // Step 7: Trigger background research using the just-written board data
+      // (not the stale board prop, which doesn't have newly created cards)
       if (r.research?.length) {
-        // Small delay for reload to settle
-        setTimeout(() => {
-          for (const job of r.research!) {
-            const card = board.cards[job.cardId];
-            if (card) startResearch(card, job.context);
-          }
-        }, 500);
+        for (const job of r.research) {
+          const realId = idMap[job.cardId] || job.cardId;
+          const card = boardData.cards[realId];
+          if (card) startResearch(card as Card, job.context);
+        }
       }
 
       setMessages((prev) =>

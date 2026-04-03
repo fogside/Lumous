@@ -60,7 +60,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
       ritual: ritualEnabled
         ? { schedule: ritualSchedule }
         : undefined,
-      research: card.research?.status === "running" ? card.research : undefined, // clear research on save (content is in description now), keep if still running
+      research: researchCleared ? undefined : card.research, // clear only after user applied to description
     });
     onClose();
   };
@@ -72,11 +72,14 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
     setResearchContext("");
   };
 
+  const [researchCleared, setResearchCleared] = useState(false);
+
   const handleApplyResearch = () => {
     if (!card.research?.result) return;
     const sep = description.trim() ? "\n\n---\n\n" : "";
     setDescription(description.trim() + sep + card.research.result);
     setDescPreview(true);
+    setResearchCleared(true); // hide research section after applying
   };
 
   return (
@@ -402,7 +405,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
               </div>
 
               {/* Research results */}
-              {card.research?.status === "done" && card.research.result && (
+              {card.research?.status === "done" && card.research.result && !researchCleared && (
                 <div style={{
                   padding: "12px 14px",
                   borderRadius: 10,
@@ -436,7 +439,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
 
               {/* Action buttons */}
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {card.research?.status === "done" && (
+                {card.research?.status === "done" && !researchCleared && (
                   <>
                     <button
                       onClick={handleApplyResearch}

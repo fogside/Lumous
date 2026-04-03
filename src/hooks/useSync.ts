@@ -63,6 +63,11 @@ export function useSync(
 
       await gitRun(["push", "-u", "origin", "main"]);
 
+      // Restore in-memory board state to disk (re-applies any active proposals/highlights
+      // that were stripped before git commit). flushSave writes boardRef.current which
+      // still has the full transient state.
+      if (flushSave) await flushSave();
+
       await updateSettings({ lastSyncedAt: new Date().toISOString() });
       setSyncState("success");
       onSynced?.();
