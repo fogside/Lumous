@@ -7,7 +7,8 @@ type SyncState = "idle" | "syncing" | "success" | "error";
 export function useSync(
   meta: Meta | null,
   updateSettings: (settings: Partial<Meta["settings"]>) => Promise<void>,
-  onSynced?: () => void
+  onSynced?: () => void,
+  flushSave?: () => Promise<void>,
 ) {
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [syncError, setSyncError] = useState<string>("");
@@ -38,6 +39,9 @@ export function useSync(
         await gitRun(["checkout", "-b", "main"]);
       }
 
+      // Flush any pending board saves before committing
+      if (flushSave) await flushSave();
+
       // Stage and commit local changes
       await gitRun(["add", "-A"]);
       try {
@@ -66,7 +70,7 @@ export function useSync(
       setSyncState("error");
       setTimeout(() => setSyncState("idle"), 5000);
     }
-  }, [repoUrl, updateSettings, onSynced]);
+  }, [repoUrl, updateSettings, onSynced, flushSave]);
 
   // Auto-sync interval — visibility-aware to avoid firing immediately on wake
   useEffect(() => {

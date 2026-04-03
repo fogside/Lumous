@@ -25,9 +25,15 @@ export async function loadBoard(id: string): Promise<Board> {
     }
   }
   // Reset stale research: if app was closed during research, mark as error
+  // Clear highlights: they're transient wizard markers, not meant to persist across sessions
   for (const card of Object.values(board.cards)) {
     if (card.research?.status === "running") {
       card.research = { ...card.research, status: "error", error: "Interrupted — try again" };
+      migrated = true;
+    }
+    if (card.highlighted) {
+      delete card.highlighted;
+      delete card.highlightReason;
       migrated = true;
     }
   }

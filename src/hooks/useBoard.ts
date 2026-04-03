@@ -398,6 +398,22 @@ export function useBoard(
     dispatch({ type: "SET_TIME_ESTIMATES", estimates });
   }, []);
 
+  // Flush any pending debounced save immediately (call before sync)
+  const flushSave = useCallback(async () => {
+    clearTimeout(saveTimeout.current);
+    if (dirtyRef.current && boardRef.current) {
+      try {
+        await saveBoard(boardRef.current);
+        if (boardRef.current.id) {
+          lastMtimeRef.current = await getBoardMtime(boardRef.current.id);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      dirtyRef.current = false;
+    }
+  }, []);
+
   // Force reload board from disk (e.g., after MagicianModal writes proposed cards)
   const reloadFromDisk = useCallback(async () => {
     const boardId = initialBoard?.id;
@@ -417,6 +433,6 @@ export function useBoard(
   return {
     board, dispatch, moveCard, addCard, updateCard, deleteCard, setGoals,
     acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
-    reorderColumn, setTimeEstimates, reloadFromDisk,
+    reorderColumn, setTimeEstimates, flushSave, reloadFromDisk,
   };
 }

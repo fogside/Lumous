@@ -41,9 +41,9 @@ export default function App() {
   const {
     board, moveCard, addCard, updateCard, deleteCard, setGoals,
     acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
-    reorderColumn, setTimeEstimates, reloadFromDisk,
+    reorderColumn, setTimeEstimates, flushSave, reloadFromDisk,
   } = useBoard(activeBoard, handleBoardChanged);
-  const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings, reloadFromDisk);
+  const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings, reloadFromDisk, flushSave);
   const { mode } = useWindowSize();
 
   const getCard = useCallback((id: string) => board?.cards[id], [board]);
