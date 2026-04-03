@@ -1,5 +1,26 @@
 # Releases
 
+## v1.8.0 — Wizard Research & Full Board Control
+
+*2026-04-03*
+
+- **Per-card research** — click any card, ask the wizard to research it in the background. Results populate as rendered markdown with "Apply to description" button
+- **Wizard labels** — wizard can assign color labels (moon crescents) to cards via chat
+- **Wizard rituals** — wizard can make cards recurring (daily, weekdays, custom days)
+- **Wizard card moves** — tell the wizard you finished tasks and it moves them to Completed
+- **Wizard memories popover** — click "N memories" to see and delete saved preferences
+- **Markdown descriptions** — card descriptions render markdown with Edit/Preview toggle, including tables, headers, lists, bold/italic
+- **Research spinner** — visible animated ✦ badge on cards during background research
+- **Production PATH fix** — wizard now works in installed app (finds claude CLI correctly)
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v1.7.0 — Wizard Planning Assistant
 
 *2026-04-03*
