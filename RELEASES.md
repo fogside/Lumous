@@ -1,5 +1,26 @@
 # Releases
 
+## v1.7.0 — Wizard Planning Assistant
+
+*2026-04-03*
+
+- **Wizard side panel** — interactive chat panel on the right side of the board, toggled by the wand button. Ask the wizard to plan your day, suggest tasks, or prioritize what to focus on
+- **Smart actions** — the wizard automatically decides what to do from your natural language: create new cards, reorder your Today column, add time estimates, and highlight related existing cards
+- **Wizard memory** — say "remember that X" and the wizard saves your preferences (e.g., "my meetings take 30min", "I exercise in the morning") across all boards and sessions
+- **Time estimates** — cards display time estimate tags (e.g., "30min", "1h") set by the wizard's day plan
+- **Proposed cards system** — wizard-suggested cards appear with dashed purple borders and accept/reject buttons. Highlighted cards get a gold glow
+- **Lumous MCP server** — Claude Code can read boards and propose cards via MCP tools, following the Pencil.dev pattern
+- **Modernized card modal** — redesigned with gradient background, borderless inputs, auto-growing description, and larger fonts
+- **Label picker fix** — fixed moon button not responding after same-column card drag
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v1.6.0 — Completion Log & Shadow Board Polish
 
 *2026-03-12*
