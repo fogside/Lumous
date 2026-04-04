@@ -1,5 +1,19 @@
 # Releases
 
+## v1.9.1 — Wizard Web Research
+
+*2026-04-04*
+
+- **Web search enabled** — wizard and per-card research can now search the web and fetch pages for real research results
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v1.9.0 — Wizard Full Board Control & Stability
 
 *2026-04-03*
