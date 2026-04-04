@@ -190,6 +190,8 @@ async fn run_claude(system_prompt: String, user_prompt: String) -> Result<String
         .arg("text")
         .arg("--model")
         .arg("claude-opus-4-6")
+        .arg("--allowedTools")
+        .arg("WebSearch,WebFetch")
         .env("PATH", &full_path)
         .current_dir(&home) // avoid network volume prompts from cwd
         .output()
