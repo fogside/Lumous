@@ -13,6 +13,7 @@ interface Props {
   onNavigateToCard: (boardId: string, cardId: string) => void;
   onOpenCard?: (card: Card, boardId: string) => void;
   onToggleWizard?: () => void;
+  showWisps?: boolean;
 }
 
 function startWindowDrag(e: React.MouseEvent) {
@@ -295,7 +296,7 @@ function SessionCard({
   );
 }
 
-export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavigateToCard, onOpenCard, onToggleWizard }: Props) {
+export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavigateToCard, onOpenCard, onToggleWizard, showWisps = true }: Props) {
   const {
     allCards, unplanned, sessions, totalPlannedMin, totalUnplannedMin,
     setSessions, moveCardToSession, removeCardFromSession, addSession, removeSession,
@@ -393,7 +394,7 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
         pointerEvents: "none",
       }} />
 
-      <BackgroundWisps boardColor="#2B3A55" isLight={false} visible={true} />
+      <BackgroundWisps boardColor="#2B3A55" isLight={false} visible={showWisps} />
 
       {/* Header — matches BoardView pattern: title + wand on one line */}
       <div onMouseDown={startWindowDrag} style={{ padding: "44px 48px 16px 48px" }}>

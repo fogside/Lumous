@@ -122,6 +122,7 @@ export default function App() {
               setTodayEditingCard({ card, boardId });
             }}
             onToggleWizard={() => setShowWizard((v) => !v)}
+            showWisps={showWisps}
           />
         ) : shadowBoardId && allBoards[shadowBoardId] ? (
           <ShadowBoardView
@@ -182,11 +183,13 @@ export default function App() {
 
         {/* Wisps toggle — always top-right of content area */}
         {(() => {
+          const isTodayActive = activeBoardId === TODAY_BOARD_ID;
           const visibleBoard = shadowBoardId && allBoards[shadowBoardId]
             ? allBoards[shadowBoardId]
             : board && activeBoardId ? (allBoards[activeBoardId] || board) : null;
-          if (!visibleBoard || isLightBoard(visibleBoard.backgroundColor)) return null;
-          const t = getBoardTheme(visibleBoard.backgroundColor);
+          if (!visibleBoard && !isTodayActive) return null;
+          if (visibleBoard && isLightBoard(visibleBoard.backgroundColor)) return null;
+          const t = visibleBoard ? getBoardTheme(visibleBoard.backgroundColor) : getBoardTheme("#2B3A55");
           return (
             <button
               onClick={() => setShowWisps(!showWisps)}
