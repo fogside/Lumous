@@ -29,10 +29,10 @@ function formatTime(min: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-const TIME_OF_DAY_LABELS: Record<string, { title: string; color: string }> = {
-  morning: { title: "Morning", color: "rgba(224,197,90,0.5)" },
-  afternoon: { title: "After Lunch", color: "rgba(220,160,90,0.4)" },
-  evening: { title: "Evening", color: "rgba(180,138,192,0.4)" },
+const TIME_OF_DAY_LABELS: Record<string, { title: string; color: string; emoji: string }> = {
+  morning: { title: "Morning", color: "rgba(224,197,90,0.5)", emoji: "🌅" },
+  afternoon: { title: "After Lunch", color: "rgba(220,160,90,0.4)", emoji: "☀️" },
+  evening: { title: "Evening", color: "rgba(180,138,192,0.4)", emoji: "🌙" },
 };
 
 const DURATION_COLORS: Record<number, string> = {
@@ -446,10 +446,7 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
               <div style={{
                 display: "flex", alignItems: "center", gap: 8, marginBottom: 10,
               }}>
-                <span style={{
-                  width: 8, height: 8, borderRadius: 4,
-                  background: info.color, flexShrink: 0,
-                }} />
+                <span style={{ fontSize: 13 }}>{info.emoji}</span>
                 <span style={{
                   fontSize: 12, fontWeight: 700, color: info.color,
                   textTransform: "uppercase", letterSpacing: "0.08em",
