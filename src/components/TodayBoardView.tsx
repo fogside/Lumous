@@ -40,8 +40,8 @@ const TIME_OF_DAY_LABELS: Record<string, { title: string; color: string; emoji: 
 
 const DURATION_COLORS: Record<number, string> = {
   25: "rgba(85,107,47,0.55)",    // olive green (#556B2F)
-  50: "rgba(110,90,180,0.45)",   // ultraviolet
-  75: "rgba(180,138,192,0.45)",  // plum
+  50: "rgba(75,60,140,0.55)",    // deep indigo
+  75: "rgba(142,74,73,0.55)",    // copper rose (#8E4A49)
 };
 
 // Selected card state for click-to-assign (instead of HTML5 DnD which doesn't work in WKWebView)
