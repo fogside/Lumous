@@ -350,7 +350,7 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: `linear-gradient(160deg, #1a1510 0%, ${DARK_INK} 40%, #0e1118 100%)`,
+        background: `linear-gradient(to left, #1a1828 0%, ${DARK_INK} 60%)`,
         position: "relative",
         overflow: "hidden",
       }}
