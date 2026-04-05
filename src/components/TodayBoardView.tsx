@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { invoke } from "@tauri-apps/api/core";
 import { Board, Card, Meta, DARK_INK, FocusSession, CardRef } from "../lib/types";
 import { useTodayBoard, AggregatedCard } from "../hooks/useTodayBoard";
 
@@ -11,6 +10,7 @@ interface Props {
   flushSave: () => Promise<void>;
   onNavigateToCard: (boardId: string, cardId: string) => void;
   onOpenCard?: (card: Card, boardId: string) => void;
+  onToggleWizard?: () => void;
 }
 
 function startWindowDrag(e: React.MouseEvent) {
@@ -29,10 +29,10 @@ function formatTime(min: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-const TIME_OF_DAY_LABELS: Record<string, { title: string }> = {
-  morning: { title: "Morning" },
-  afternoon: { title: "After Lunch" },
-  evening: { title: "Evening" },
+const TIME_OF_DAY_LABELS: Record<string, { title: string; color: string }> = {
+  morning: { title: "Morning", color: "rgba(224,197,90,0.5)" },
+  afternoon: { title: "After Lunch", color: "rgba(220,160,90,0.4)" },
+  evening: { title: "Evening", color: "rgba(180,138,192,0.4)" },
 };
 
 const DURATION_COLORS: Record<number, string> = {
@@ -293,91 +293,14 @@ function SessionCard({
   );
 }
 
-export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavigateToCard, onOpenCard }: Props) {
+export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavigateToCard, onOpenCard, onToggleWizard }: Props) {
   const {
     allCards, unplanned, sessions, totalPlannedMin, totalUnplannedMin,
     setSessions, moveCardToSession, removeCardFromSession, addSession, removeSession,
     completeCard, uncompleteCard, reorderCardInSession, startSession, isSessionComplete, parseMinutes,
   } = useTodayBoard(boards, meta, updateSettings, flushSave);
 
-  const [planning, setPlanning] = useState(false);
-  const [planError, setPlanError] = useState<string | null>(null);
-  const [showPlanInput, setShowPlanInput] = useState(false);
-  const [planPrompt, setPlanPrompt] = useState("");
   const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null);
-
-  const planMyDay = async (customPrompt?: string) => {
-    if (planning || allCards.length === 0) return;
-    setPlanning(true);
-    setPlanError(null);
-
-    try {
-      const memories = meta?.settings.wizardMemories || [];
-      const memoryBlock = memories.length > 0
-        ? `\n\nUser preferences and rules:\n${memories.map((m) => `- ${m}`).join("\n")}`
-        : "";
-
-      const cardList = allCards.map((ac) => {
-        const est = ac.card.timeEstimate || "15min";
-        const labels = [ac.card.label, ac.boardTitle].filter(Boolean).join(", ");
-        return `- [${ac.card.id}] "${ac.card.title}" (${est}) from board "${ac.boardTitle}"${ac.card.label ? ` [label: ${ac.card.label}]` : ""}${ac.card.goalId ? " [has goal]" : ""}${ac.card.ritual ? " [recurring]" : ""}`;
-      }).join("\n");
-
-      const systemPrompt = `You are a focus session planner. Given a list of tasks with time estimates, create an optimal day plan grouped into focus sessions (25, 50, or 75 minutes each).
-
-Rules for session planning:
-- Sessions can be 25, 50, or 75 minutes only (focus mode durations)
-- Start the day with shorter sessions (25min) for admin/quick tasks
-- Group similar short tasks (admin, emails, quick chores) into 25min sessions
-- Group deep work (coding, writing, research) into 50-75min sessions
-- Mix task types within sessions when possible (e.g., exercise + reading, not two coding tasks)
-- Put physically active tasks (exercise, walks) in morning
-- Put heavy thinking tasks in morning or early afternoon
-- Put lighter tasks (reading, journaling, planning) in evening
-- Each card can only appear in ONE session
-- Total session time should not exceed the sum of card estimates
-- ALL cards must be assigned to a session — no unplanned cards left
-
-You MUST respond with ONLY a valid JSON array of sessions. No text, no markdown, no explanation — just the JSON array:
-[{"duration": 25|50|75, "timeOfDay": "morning"|"afternoon"|"evening", "cardIds": ["id1", "id2"]}]${memoryBlock}`;
-
-      const customBlock = customPrompt ? `\n\nUser's instructions: ${customPrompt}` : "";
-      const userPrompt = `Plan these ${allCards.length} tasks into focus sessions:\n\n${cardList}${customBlock}\n\nFirst, add time estimates to any cards missing them. Then create sessions. Respond with ONLY the JSON array.`;
-
-      const result = await invoke<string>("run_claude", {
-        systemPrompt,
-        userPrompt,
-      });
-
-      // Parse JSON
-      let jsonStr = result.trim();
-      const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (fenceMatch) jsonStr = fenceMatch[1].trim();
-      const arrMatch = jsonStr.match(/\[[\s\S]*\]/);
-      if (arrMatch) jsonStr = arrMatch[0];
-
-      const planned: { duration: number; timeOfDay: string; cardIds: string[] }[] = JSON.parse(jsonStr);
-
-      // Convert to FocusSession objects
-      const newSessions: FocusSession[] = planned.map((p) => ({
-        id: crypto.randomUUID(),
-        duration: ([25, 50, 75].includes(p.duration) ? p.duration : 25) as 25 | 50 | 75,
-        timeOfDay: (["morning", "afternoon", "evening"].includes(p.timeOfDay) ? p.timeOfDay : "morning") as "morning" | "afternoon" | "evening",
-        cardRefs: p.cardIds
-          .map((cid) => {
-            const ac = allCards.find((a) => a.card.id === cid);
-            return ac ? { boardId: ac.boardId, cardId: cid } : null;
-          })
-          .filter(Boolean) as CardRef[],
-      }));
-
-      setSessions(newSessions);
-    } catch (e) {
-      setPlanError(String(e));
-    } finally {
-      setPlanning(false);
-    }
-  };
 
   const handleSelectCard = useCallback((ac: AggregatedCard) => {
     setSelectedCard((prev) =>
@@ -435,17 +358,13 @@ You MUST respond with ONLY a valid JSON array of sessions. No text, no markdown,
       {/* Header */}
       <div onMouseDown={startWindowDrag} style={{ padding: "44px 48px 20px 48px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ color: "rgba(255,255,255,0.3)" }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" />
-              <path d="M17.8 11.8L19 13" /><path d="M15 9h.01" />
-              <path d="M17.8 6.2L19 5" /><path d="M3 21l9-9" />
-              <path d="M12.2 6.2L11 5" />
-            </svg>
-          </span>
+          <span style={{ fontSize: 26 }}>{"🎩"}</span>
           <h1 style={{ fontSize: 28, fontWeight: 700, color: "rgba(255,255,255,0.9)", margin: 0 }}>
             Today
           </h1>
+          <span style={{ fontSize: 11, color: "rgba(224,197,90,0.3)", fontWeight: 500, alignSelf: "flex-end", marginBottom: 4 }}>
+            {new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
+          </span>
         </div>
         <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 13, color: "rgba(255,255,255,0.25)", display: "flex", gap: 16 }}>
@@ -454,114 +373,30 @@ You MUST respond with ONLY a valid JSON array of sessions. No text, no markdown,
             {totalPlannedMin > 0 && <span>{formatTime(totalPlannedMin)} planned</span>}
           </span>
           <div style={{ flex: 1 }} />
-          {totalCards > 0 && !showPlanInput && (
-            <div style={{ display: "flex", gap: 6 }}>
-              <button
-                onClick={() => planMyDay()}
-                disabled={planning}
-                data-no-drag
-                style={{
-                  padding: "7px 16px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  borderRadius: 8,
-                  border: "none",
-                  background: planning ? "rgba(180,138,192,0.08)" : "rgba(180,138,192,0.15)",
-                  color: planning ? "rgba(180,138,192,0.4)" : "rgba(200,170,220,0.9)",
-                  cursor: planning ? "default" : "pointer",
-                  transition: "all 0.15s",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                {planning ? (
-                  <>
-                    <span style={{ animation: "wizard-spin 1s linear infinite", display: "inline-block" }}>{"✦"}</span>
-                    Planning...
-                  </>
-                ) : (
-                  <>{"✦"} Plan my day</>
-                )}
-              </button>
-              {!planning && (
-                <button
-                  onClick={() => setShowPlanInput(true)}
-                  data-no-drag
-                  title="Plan with custom instructions"
-                  style={{
-                    padding: "7px 10px",
-                    fontSize: 12,
-                    borderRadius: 8,
-                    border: "none",
-                    background: "rgba(255,255,255,0.04)",
-                    color: "rgba(255,255,255,0.2)",
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  {"✎"}
-                </button>
-              )}
-            </div>
+          {onToggleWizard && (
+            <button
+              onClick={onToggleWizard}
+              data-no-drag
+              title="Ask the Wizard to plan your day"
+              style={{
+                width: 30, height: 30, borderRadius: 8,
+                border: "none", background: "transparent",
+                color: "rgba(255,255,255,0.25)", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.15s", flexShrink: 0, opacity: 0.6,
+                fontSize: 16,
+              }}
+              className="wand-btn"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" />
+                <path d="M17.8 11.8L19 13" /><path d="M15 9h.01" />
+                <path d="M17.8 6.2L19 5" /><path d="M3 21l9-9" />
+                <path d="M12.2 6.2L11 5" />
+              </svg>
+            </button>
           )}
         </div>
-
-        {/* Custom plan prompt */}
-        {showPlanInput && (
-          <div data-no-drag style={{ padding: "0 48px", marginBottom: 12 }}>
-            <div style={{
-              display: "flex", gap: 8, alignItems: "flex-end",
-              background: "rgba(255,255,255,0.03)",
-              borderRadius: 10, padding: "10px 12px",
-            }}>
-              <textarea
-                value={planPrompt}
-                onChange={(e) => setPlanPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && e.metaKey) { e.preventDefault(); planMyDay(planPrompt); setShowPlanInput(false); setPlanPrompt(""); }
-                  if (e.key === "Escape") { setShowPlanInput(false); setPlanPrompt(""); }
-                }}
-                placeholder="e.g., Put exercise first, keep afternoon light, I have a meeting at 2pm..."
-                autoFocus
-                rows={2}
-                style={{
-                  flex: 1, background: "transparent", border: "none", padding: 0,
-                  fontSize: 13, color: "rgba(255,255,255,0.8)", outline: "none",
-                  resize: "none", lineHeight: 1.5,
-                  fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
-                }}
-              />
-              <button
-                onClick={() => { planMyDay(planPrompt); setShowPlanInput(false); setPlanPrompt(""); }}
-                disabled={planning}
-                data-no-drag
-                style={{
-                  padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 7,
-                  border: "none", background: "rgba(180,138,192,0.15)",
-                  color: "rgba(200,170,220,0.9)", cursor: "pointer", flexShrink: 0,
-                }}
-              >
-                {"✦"} Plan
-              </button>
-              <button
-                onClick={() => { setShowPlanInput(false); setPlanPrompt(""); }}
-                data-no-drag
-                style={{
-                  padding: "6px 10px", fontSize: 12, borderRadius: 7,
-                  border: "none", background: "transparent",
-                  color: "rgba(255,255,255,0.2)", cursor: "pointer", flexShrink: 0,
-                }}
-              >
-                {"×"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {planError && (
-          <div style={{ padding: "0 48px", marginBottom: 8, fontSize: 12, color: "rgba(220,120,120,0.7)" }}>{planError}</div>
-        )}
       </div>
 
       {/* Content — scrollable */}
@@ -593,9 +428,12 @@ You MUST respond with ONLY a valid JSON array of sessions. No text, no markdown,
               <div style={{
                 display: "flex", alignItems: "center", gap: 8, marginBottom: 10,
               }}>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.15)" }}>{"✦"}</span>
                 <span style={{
-                  fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.3)",
+                  width: 8, height: 8, borderRadius: 4,
+                  background: info.color, flexShrink: 0,
+                }} />
+                <span style={{
+                  fontSize: 12, fontWeight: 700, color: info.color,
                   textTransform: "uppercase", letterSpacing: "0.08em",
                 }}>
                   {info.title}

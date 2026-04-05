@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Board, Card, CARD_LABELS, DARK_INK, Meta } from "../lib/types";
+import { Board, Card, CARD_LABELS, CardRef, DARK_INK, FocusSession, Meta } from "../lib/types";
 import { invoke } from "@tauri-apps/api/core";
 import { loadMeta, saveMeta } from "../lib/storage";
 import { renderMarkdown } from "../lib/markdown";
@@ -19,6 +19,7 @@ interface WizardResponse {
   highlights?: { cardId: string; reason: string }[];
   research?: { cardId: string; context: string }[];
   labels?: { cardId: string; label: string }[];
+  sessions?: { duration: number; timeOfDay: string; cardIds: string[] }[];
   rituals?: { cardId: string; schedule: "daily" | number[] | null }[];
   moveCards?: { cardId: string; toColumn: string }[];
   remember?: string[];
@@ -30,7 +31,9 @@ type ChatMessage =
   | { role: "system"; text: string };
 
 interface Props {
-  board: Board;
+  board: Board | null;
+  boards?: Record<string, Board>;
+  isTodayBoard?: boolean;
   meta: Meta | null;
   onClose: () => void;
   updateCard: (card: Card) => void;
@@ -43,7 +46,46 @@ interface Props {
   flushSave: () => Promise<void>;
 }
 
-// ─── Board serializer ───────────────────────────────────────────
+// ─── Board serializers ──────────────────────────────────────────
+
+function serializeTodayBoard(allBoards: Record<string, Board>, meta: Meta | null): string {
+  const lines: string[] = ["# Today Board — Focus Session Planner"];
+  const sessions = meta?.settings.todaySessions || [];
+
+  // Collect all today + in-progress cards
+  lines.push("\n## All Today & In-Progress Tasks:");
+  for (const b of Object.values(allBoards)) {
+    for (const col of b.columns) {
+      if (col.id !== "today" && col.id !== "in-progress") continue;
+      for (const cardId of col.cardIds) {
+        const card = b.cards[cardId];
+        if (!card || card.proposed) continue;
+        let line = `- [${cardId}] "${card.title}" (${card.timeEstimate || "no estimate"}) from board "${b.title}"`;
+        if (card.label) line += ` [label: ${card.label}]`;
+        lines.push(line);
+      }
+    }
+  }
+
+  // Current sessions
+  if (sessions.length > 0) {
+    lines.push("\n## Current Sessions:");
+    for (const s of sessions) {
+      const completed = new Set(s.completedCardIds || []);
+      const cardNames = s.cardRefs.map((r) => {
+        const b = allBoards[r.boardId];
+        const card = b?.cards[r.cardId];
+        const done = completed.has(r.cardId) ? " [DONE]" : "";
+        return card ? `"${card.title}"${done}` : r.cardId;
+      });
+      lines.push(`- ${s.timeOfDay} ${s.duration}min session${s.started ? " [STARTED]" : ""}: ${cardNames.join(", ")}`);
+    }
+  } else {
+    lines.push("\n## No sessions planned yet.");
+  }
+
+  return lines.join("\n");
+}
 
 function serializeBoard(board: Board): string {
   const lines: string[] = [`Board: ${board.title}`];
@@ -117,7 +159,7 @@ Rules:
 
 // ─── Component ──────────────────────────────────────────────────
 
-export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, setTimeEstimates, reloadFromDisk, updateSettings, startResearch, moveCard, flushSave }: Props) {
+export function WizardPanel({ board, boards, isTodayBoard, meta, onClose, updateCard, reorderColumn, setTimeEstimates, reloadFromDisk, updateSettings, startResearch, moveCard, flushSave }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -126,19 +168,20 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
 
   const memories = meta?.settings.wizardMemories || [];
   const [showMemories, setShowMemories] = useState(false);
-  const boardIdRef = useRef(board.id);
+  const boardIdRef = useRef(board?.id || "today-board");
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
   // Clear chat when board changes (prevent applying actions to wrong board)
   useEffect(() => {
-    if (board.id !== boardIdRef.current) {
-      boardIdRef.current = board.id;
+    const currentId = board?.id || "today-board";
+    if (currentId !== boardIdRef.current) {
+      boardIdRef.current = currentId;
       setMessages([]);
       setInput("");
       setLoading(false);
     }
-  }, [board.id]);
+  }, [board?.id, isTodayBoard]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -173,10 +216,20 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
     setLoading(true);
 
     try {
-      const boardState = serializeBoard(board);
+      const boardState = isTodayBoard && boards
+        ? serializeTodayBoard(boards, meta)
+        : board ? serializeBoard(board) : "No board loaded";
       const transcript = buildTranscript([...messages, { role: "user", text: userText }]);
 
-      const userPrompt = `## Current Board State\n${boardState}\n\n## Conversation so far\n${transcript}\n\nRespond with a JSON object. No markdown fences.`;
+      const todayBoardExtra = isTodayBoard ? `
+
+When on the Today Board, you can also use:
+- "sessions": a JSON array to create/replace focus sessions. Format: [{"duration": 25|50|75, "timeOfDay": "morning"|"afternoon"|"evening", "cardIds": ["card-id-1", "card-id-2"]}]
+  Rules: sessions are 25, 50, or 75 min. Group admin/quick tasks in 25min. Deep work in 50-75min. Mix task types. Exercise in morning, light tasks in evening. ALL cards should be assigned.
+
+Include "sessions" when the user asks to plan their day, rearrange sessions, or organize tasks into focus blocks.` : "";
+
+      const userPrompt = `## Current Board State\n${boardState}\n\n## Conversation so far\n${transcript}${todayBoardExtra}\n\nRespond with a JSON object. No markdown fences.`;
 
       const result = await invoke<string>("run_claude", {
         systemPrompt: buildSystemPrompt(memories),
@@ -216,7 +269,7 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
   const hasActions = (msg: ChatMessage): msg is { role: "wizard"; response: WizardResponse; applied?: boolean } => {
     if (msg.role !== "wizard") return false;
     const r = msg.response;
-    return !!(r.newCards?.length || r.dayPlan || r.highlights?.length || r.research?.length || r.labels?.length || r.rituals?.length || r.moveCards?.length);
+    return !!(r.newCards?.length || r.dayPlan || r.highlights?.length || r.research?.length || r.labels?.length || r.rituals?.length || r.moveCards?.length || r.sessions?.length);
   };
 
   const applyingRef = useRef(false);
@@ -233,6 +286,7 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
 
       // Apply ALL actions atomically via one disk write + one reload
       // This prevents polling from wiping in-flight reducer changes
+      if (board) {
       const boardData = JSON.parse(await invoke<string>("load_board", { id: board.id }));
       const idMap: Record<string, string> = {};
 
@@ -344,14 +398,37 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
       await invoke("save_board", { id: board.id, data: JSON.stringify(boardData, null, 2) });
       reloadFromDisk();
 
-      // Step 7: Trigger background research using the just-written board data
-      // (not the stale board prop, which doesn't have newly created cards)
+      // Trigger background research using the just-written board data
       if (r.research?.length) {
         for (const job of r.research) {
           const realId = idMap[job.cardId] || job.cardId;
           const card = boardData.cards[realId];
           if (card) startResearch(card as Card, job.context);
         }
+      }
+      } // end if (board)
+
+      // Step 7: Create focus sessions (Today Board)
+      if (r.sessions?.length && boards) {
+        const newSessions: FocusSession[] = r.sessions.map((s) => {
+          const cardRefs: CardRef[] = s.cardIds
+            .map((cid) => {
+              for (const b of Object.values(boards)) {
+                if (b.cards[cid]) return { boardId: b.id, cardId: cid };
+              }
+              return null;
+            })
+            .filter(Boolean) as CardRef[];
+
+          return {
+            id: crypto.randomUUID(),
+            duration: ([25, 50, 75].includes(s.duration) ? s.duration : 25) as 25 | 50 | 75,
+            timeOfDay: (["morning", "afternoon", "evening"].includes(s.timeOfDay) ? s.timeOfDay : "morning") as "morning" | "afternoon" | "evening",
+            cardRefs,
+          };
+        });
+        const today = new Date().toISOString().slice(0, 10);
+        updateSettings({ todaySessions: newSessions, todayDate: today });
       }
 
       setMessages((prev) =>
@@ -549,9 +626,10 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
               const idx = parseInt(id.split("_")[1]);
               if (r.newCards[idx]) return r.newCards[idx].title;
             }
-            if (board.cards[id]) return board.cards[id].title;
-            // Try partial match — Claude sometimes returns truncated IDs
-            const match = Object.entries(board.cards).find(([k]) => k.startsWith(id) || id.startsWith(k));
+            // Check current board or all boards
+            const allCards = board ? board.cards : Object.values(boards || {}).reduce((acc, b) => ({ ...acc, ...b.cards }), {} as Record<string, Card>);
+            if (allCards[id]) return allCards[id].title;
+            const match = Object.entries(allCards).find(([k]) => k.startsWith(id) || id.startsWith(k));
             if (match) return match[1].title;
             return id.slice(0, 8) + "…";
           };
@@ -564,6 +642,7 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
           if (r.labels?.length) actionSummary.push(`${r.labels.length} label${r.labels.length > 1 ? "s" : ""}`);
           if (r.rituals?.length) actionSummary.push(`${r.rituals.length} ritual${r.rituals.length > 1 ? "s" : ""}`);
           if (r.moveCards?.length) actionSummary.push(`${r.moveCards.length} move${r.moveCards.length > 1 ? "s" : ""}`);
+          if (r.sessions?.length) actionSummary.push(`${r.sessions.length} session${r.sessions.length > 1 ? "s" : ""}`);
 
           return (
             <div key={i} style={{
@@ -689,12 +768,29 @@ export function WizardPanel({ board, meta, onClose, updateCard, reorderColumn, s
                 </div>
               )}
 
+              {/* Sessions */}
+              {r.sessions && r.sessions.length > 0 && (
+                <div style={{ padding: "0 4px" }}>
+                  {r.sessions.map((s, j) => (
+                    <div key={j} style={{
+                      fontSize: 12, color: "rgba(224,197,90,0.6)",
+                      padding: "3px 0", display: "flex", alignItems: "baseline", gap: 6,
+                    }}>
+                      <span style={{ fontWeight: 600 }}>{s.timeOfDay} {s.duration}min</span>
+                      <span style={{ color: "rgba(255,255,255,0.3)" }}>
+                        {s.cardIds.length} task{s.cardIds.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Card moves */}
               {r.moveCards && r.moveCards.length > 0 && (
                 <div style={{ padding: "0 4px" }}>
                   {r.moveCards.map((mv, j) => {
                     const cardTitle = resolveTitle(mv.cardId);
-                    const colName = board.columns.find((c) => c.id === mv.toColumn)?.title || mv.toColumn;
+                    const colName = board?.columns.find((c) => c.id === mv.toColumn)?.title || mv.toColumn;
                     return (
                       <div key={j} style={{
                         fontSize: 12,

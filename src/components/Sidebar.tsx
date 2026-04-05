@@ -124,15 +124,10 @@ export function Sidebar({
               alignItems: "center",
               justifyContent: "center",
               padding: 0,
-              color: activeBoardId === TODAY_BOARD_ID ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)",
+              fontSize: 16,
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" />
-              <path d="M17.8 11.8L19 13" /><path d="M15 9h.01" />
-              <path d="M17.8 6.2L19 5" /><path d="M3 21l9-9" />
-              <path d="M12.2 6.2L11 5" />
-            </svg>
+            {"🎩"}
           </button>
           <div style={{ width: 24, borderBottom: "1px solid rgba(255,255,255,0.06)" }} />
           {boardOrder.map((id) => {
@@ -255,14 +250,7 @@ export function Sidebar({
             marginBottom: 4,
           }}
         >
-          <span style={{ flexShrink: 0, color: activeBoardId === TODAY_BOARD_ID ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.3)" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" />
-              <path d="M17.8 11.8L19 13" /><path d="M15 9h.01" />
-              <path d="M17.8 6.2L19 5" /><path d="M3 21l9-9" />
-              <path d="M12.2 6.2L11 5" />
-            </svg>
-          </span>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>{"🎩"}</span>
           <span style={{ fontSize: 15, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
             Today
           </span>

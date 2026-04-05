@@ -121,6 +121,7 @@ export default function App() {
             onOpenCard={(card, boardId) => {
               setTodayEditingCard({ card, boardId });
             }}
+            onToggleWizard={() => setShowWizard((v) => !v)}
           />
         ) : shadowBoardId && allBoards[shadowBoardId] ? (
           <ShadowBoardView
@@ -216,10 +217,12 @@ export default function App() {
         })()}
       </main>
 
-      {showWizard && board && !isCompact && (
+      {showWizard && (board || activeBoardId === TODAY_BOARD_ID) && !isCompact && (
         <WizardPanel
-          board={activeBoardId ? allBoards[activeBoardId] || board : board}
+          board={activeBoardId === TODAY_BOARD_ID ? null : (activeBoardId ? allBoards[activeBoardId] || board : board)}
+          boards={allBoards}
           meta={meta}
+          isTodayBoard={activeBoardId === TODAY_BOARD_ID}
           onClose={() => setShowWizard(false)}
           updateCard={updateCard}
           reorderColumn={reorderColumn}
