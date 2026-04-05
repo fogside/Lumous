@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Board, Meta, DARK_INK } from "../lib/types";
+import { Board, Meta, DARK_INK, TODAY_BOARD_ID } from "../lib/types";
 import { SyncStatus } from "./SyncStatus";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CompletionHeatmap } from "./CompletionHeatmap";
@@ -106,6 +106,35 @@ export function Sidebar({
         )}
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, flex: 1, overflowY: "auto", width: "100%", paddingTop: 4, paddingBottom: 14 }}>
+          {/* Today Board — pinned */}
+          <button
+            onClick={() => onSelectBoard(TODAY_BOARD_ID)}
+            title="Today Board"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              flexShrink: 0,
+              background: activeBoardId === TODAY_BOARD_ID ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.04)",
+              border: activeBoardId === TODAY_BOARD_ID ? "2px solid rgba(255,255,255,0.4)" : "2px solid transparent",
+              cursor: "pointer",
+              transition: "all 0.15s",
+              transform: activeBoardId === TODAY_BOARD_ID ? "scale(1.1)" : "scale(1)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 0,
+              color: activeBoardId === TODAY_BOARD_ID ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" />
+              <path d="M17.8 11.8L19 13" /><path d="M15 9h.01" />
+              <path d="M17.8 6.2L19 5" /><path d="M3 21l9-9" />
+              <path d="M12.2 6.2L11 5" />
+            </svg>
+          </button>
+          <div style={{ width: 24, borderBottom: "1px solid rgba(255,255,255,0.06)" }} />
           {boardOrder.map((id) => {
             const board = boards[id];
             if (!board) return null;
@@ -207,6 +236,39 @@ export function Sidebar({
 
       {/* Board list */}
       <div style={{ flex: 1, overflowY: "auto", padding: "0 14px" }}>
+        {/* Today Board — pinned at top */}
+        <button
+          onClick={() => onSelectBoard(TODAY_BOARD_ID)}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            padding: "12px 16px",
+            borderRadius: 12,
+            textAlign: "left",
+            background: activeBoardId === TODAY_BOARD_ID ? "rgba(255,255,255,0.1)" : "transparent",
+            color: activeBoardId === TODAY_BOARD_ID ? "white" : "rgba(255,255,255,0.45)",
+            border: "none",
+            cursor: "pointer",
+            transition: "all 0.15s",
+            marginBottom: 4,
+          }}
+        >
+          <span style={{ flexShrink: 0, color: activeBoardId === TODAY_BOARD_ID ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.3)" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" />
+              <path d="M17.8 11.8L19 13" /><path d="M15 9h.01" />
+              <path d="M17.8 6.2L19 5" /><path d="M3 21l9-9" />
+              <path d="M12.2 6.2L11 5" />
+            </svg>
+          </span>
+          <span style={{ fontSize: 15, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+            Today
+          </span>
+        </button>
+        <div style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", margin: "4px 16px 8px 16px" }} />
+
         {boardOrder.map((id) => {
           const board = boards[id];
           if (!board) return null;

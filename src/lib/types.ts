@@ -73,11 +73,30 @@ export interface Board {
   ritualLog?: RitualLogEntry[];
 }
 
+export interface CardRef {
+  boardId: string;
+  cardId: string;
+}
+
+export interface FocusSession {
+  id: string;
+  title?: string;
+  duration: 25 | 50 | 75;
+  timeOfDay: "morning" | "afternoon" | "evening";
+  cardRefs: CardRef[];
+  completedCardIds?: string[];  // cards completed within this session
+  started?: boolean;
+}
+
+export const TODAY_BOARD_ID = "today-board";
+
 export interface Settings {
   syncRepoUrl: string;
   syncIntervalMinutes: number;
   lastSyncedAt: string | null;
-  wizardMemories?: string[];  // persistent wizard preferences/rules across all boards
+  wizardMemories?: string[];
+  todaySessions?: FocusSession[];
+  todayDate?: string;  // YYYY-MM-DD — sessions reset when date changes
 }
 
 export interface Meta {

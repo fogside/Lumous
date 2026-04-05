@@ -5,7 +5,9 @@
       "Bash(ls -la ~/.claude/*.md)",
       "Bash(node --version)",
       "Bash(npm --version)",
-      "Bash(swift --version)"
+      "Bash(swift --version)",
+      "Bash(node /Users/zenja/Projects/personal/todo/mcp-server/dist/index.js)",
+      "Bash(printf '{\"\"\"\"jsonrpc\"\"\"\":\"\"\"\"2.0\"\"\"\",\"\"\"\"id\"\"\"\":1,\"\"\"\"method\"\"\"\":\"\"\"\"initialize\"\"\"\",\"\"\"\"params\"\"\"\":{\"\"\"\"protocolVersion\"\"\"\":\"\"\"\"2024-11-05\"\"\"\",\"\"\"\"capabilities\"\"\"\":{},\"\"\"\"clientInfo\"\"\"\":{\"\"\"\"name\"\"\"\":\"\"\"\"test\"\"\"\",\"\"\"\"version\"\"\"\":\"\"\"\"1.0.0\"\"\"\"}}}\\\\n{\"\"\"\"jsonrpc\"\"\"\":\"\"\"\"2.0\"\"\"\",\"\"\"\"id\"\"\"\":2,\"\"\"\"method\"\"\"\":\"\"\"\"tools/list\"\"\"\",\"\"\"\"params\"\"\"\":{}}\\\\n')"
     ],
     "additionalDirectories": [
       "/Users/zenja/.claude",

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { DARK_INK, isLightBoard, getBoardTheme } from "./lib/types";
+import { DARK_INK, isLightBoard, getBoardTheme, TODAY_BOARD_ID } from "./lib/types";
 import { Sparkles } from "lucide-react";
 import { useBoards } from "./hooks/useBoards";
 import { useBoard } from "./hooks/useBoard";
@@ -16,6 +16,8 @@ import { BoardSettingsModal } from "./components/BoardSettingsModal";
 import { NewBoardModal } from "./components/NewBoardModal";
 import { SyncSettingsModal } from "./components/SyncSettingsModal";
 import { WizardPanel } from "./components/WizardPanel";
+import { TodayBoardView } from "./components/TodayBoardView";
+import { CardModal } from "./components/CardModal";
 
 export default function App() {
   const {
@@ -57,6 +59,7 @@ export default function App() {
   const [shadowBoardId, setShadowBoardId] = useState<string | null>(null);
   const [showWisps, setShowWisps] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
+  const [todayEditingCard, setTodayEditingCard] = useState<{ card: Board["cards"][string]; boardId: string } | null>(null);
 
   if (loading) {
     return (
@@ -106,7 +109,20 @@ export default function App() {
       )}
 
       <main style={{ flex: 1, overflow: "hidden", position: "relative" }}>
-        {shadowBoardId && allBoards[shadowBoardId] ? (
+        {activeBoardId === TODAY_BOARD_ID ? (
+          <TodayBoardView
+            boards={allBoards}
+            meta={meta}
+            updateSettings={updateSettings}
+            flushSave={flushSave}
+            onNavigateToCard={(boardId) => {
+              setActiveBoardId(boardId);
+            }}
+            onOpenCard={(card, boardId) => {
+              setTodayEditingCard({ card, boardId });
+            }}
+          />
+        ) : shadowBoardId && allBoards[shadowBoardId] ? (
           <ShadowBoardView
             board={allBoards[shadowBoardId]}
             onClose={() => setShadowBoardId(null)}
@@ -239,6 +255,27 @@ export default function App() {
           settings={meta.settings}
           onSave={updateSettings}
           onClose={() => setShowSyncSettings(false)}
+        />
+      )}
+
+      {todayEditingCard && (
+        <CardModal
+          card={allBoards[todayEditingCard.boardId]?.cards[todayEditingCard.card.id] || todayEditingCard.card}
+          columnId="today"
+          goals={allBoards[todayEditingCard.boardId]?.goals}
+          onSave={async (updatedCard) => {
+            try {
+              const { invoke } = await import("@tauri-apps/api/core");
+              const boardJson = await invoke<string>("load_board", { id: todayEditingCard.boardId });
+              const boardData = JSON.parse(boardJson);
+              boardData.cards[updatedCard.id] = updatedCard;
+              await invoke("save_board", { id: todayEditingCard.boardId, data: JSON.stringify(boardData, null, 2) });
+              // Refresh the boards record so Today Board shows updated data
+              refreshBoard(boardData);
+            } catch (e) { console.error(e); }
+          }}
+          onDelete={() => {}}
+          onClose={() => setTodayEditingCard(null)}
         />
       )}
 
