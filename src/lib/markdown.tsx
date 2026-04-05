@@ -125,7 +125,8 @@ export function renderMarkdown(text: string): ReactNode[] {
 
 export function renderInline(text: string): ReactNode {
   const parts: ReactNode[] = [];
-  const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)/g;
+  // Match: **bold**, *italic*, `code`, [link](url), bare URLs
+  const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\[(.+?)\]\((.+?)\))|(https?:\/\/[^\s<)]+)/g;
   let last = 0;
   let match;
   let key = 0;
@@ -143,6 +144,18 @@ export function renderInline(text: string): ReactNode {
         fontSize: "0.9em", padding: "1px 4px", borderRadius: 3,
         background: "rgba(255,255,255,0.06)",
       }}>{match[6]}</code>);
+    } else if (match[8] && match[9]) {
+      // [text](url) markdown link
+      parts.push(<a key={key++} href={match[9]} target="_blank" rel="noopener noreferrer" style={{
+        color: "rgba(140,170,220,0.8)", textDecoration: "underline",
+        textDecorationColor: "rgba(140,170,220,0.3)",
+      }} onClick={(e) => e.stopPropagation()}>{match[8]}</a>);
+    } else if (match[10]) {
+      // bare URL
+      parts.push(<a key={key++} href={match[10]} target="_blank" rel="noopener noreferrer" style={{
+        color: "rgba(140,170,220,0.8)", textDecoration: "underline",
+        textDecorationColor: "rgba(140,170,220,0.3)",
+      }} onClick={(e) => e.stopPropagation()}>{match[10]}</a>);
     }
     last = match.index + match[0].length;
   }

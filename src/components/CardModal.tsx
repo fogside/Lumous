@@ -64,18 +64,22 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
     }
   }, [card]);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
-
   const [researchContext, setResearchContext] = useState("");
   const [showResearchInput, setShowResearchInput] = useState(false);
   const hasMarkdown = /[*#\-`|]/.test(card.description);
   const [descPreview, setDescPreview] = useState(hasMarkdown && card.description.trim().length > 0);
+  const [readingMode, setReadingMode] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (readingMode) { setReadingMode(false); return; }
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose, readingMode]);
 
   const handleSave = () => {
     if (!title.trim()) return;
@@ -167,28 +171,48 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
         {/* Scrollable content area */}
         <div style={{ flex: 1, overflowY: "auto", padding: "0 26px 20px 26px" }}>
 
-          {/* Description — edit / preview toggle */}
+          {/* Description — edit / preview / expand toggle */}
           <div style={{ marginTop: 16 }}>
-            {/[*#\-`|]/.test(description) && description.trim() && (
+            {description.trim() && (
               <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+                {/[*#\-`|]/.test(description) && (
+                  <>
+                    <button
+                      onClick={() => setDescPreview(false)}
+                      style={{
+                        padding: "3px 10px", borderRadius: 5, fontSize: 11, fontWeight: 600,
+                        background: !descPreview ? "rgba(255,255,255,0.08)" : "transparent",
+                        border: "none", color: !descPreview ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.2)",
+                        cursor: "pointer", transition: "all 0.15s",
+                      }}
+                    >Edit</button>
+                    <button
+                      onClick={() => setDescPreview(true)}
+                      style={{
+                        padding: "3px 10px", borderRadius: 5, fontSize: 11, fontWeight: 600,
+                        background: descPreview ? "rgba(255,255,255,0.08)" : "transparent",
+                        border: "none", color: descPreview ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.2)",
+                        cursor: "pointer", transition: "all 0.15s",
+                      }}
+                    >Preview</button>
+                  </>
+                )}
+                <div style={{ flex: 1 }} />
                 <button
-                  onClick={() => setDescPreview(false)}
+                  onClick={() => setReadingMode(true)}
+                  title="Reading mode"
                   style={{
-                    padding: "3px 10px", borderRadius: 5, fontSize: 11, fontWeight: 600,
-                    background: !descPreview ? "rgba(255,255,255,0.08)" : "transparent",
-                    border: "none", color: !descPreview ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.2)",
-                    cursor: "pointer", transition: "all 0.15s",
+                    padding: "3px 8px", borderRadius: 5, fontSize: 11, fontWeight: 600,
+                    background: "transparent", border: "none",
+                    color: "rgba(255,255,255,0.2)", cursor: "pointer",
+                    transition: "all 0.15s", display: "flex", alignItems: "center", gap: 4,
                   }}
-                >Edit</button>
-                <button
-                  onClick={() => setDescPreview(true)}
-                  style={{
-                    padding: "3px 10px", borderRadius: 5, fontSize: 11, fontWeight: 600,
-                    background: descPreview ? "rgba(255,255,255,0.08)" : "transparent",
-                    border: "none", color: descPreview ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.2)",
-                    cursor: "pointer", transition: "all 0.15s",
-                  }}
-                >Preview</button>
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 3h6v6" /><path d="M9 21H3v-6" />
+                    <path d="M21 3l-7 7" /><path d="M3 21l7-7" />
+                  </svg>
+                </button>
               </div>
             )}
 
@@ -621,6 +645,139 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
           </div>
         </div>
       </div>
+
+      {/* Reading mode — fullscreen description view */}
+      {readingMode && (
+        <div
+          onClick={() => setReadingMode(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(12px)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            paddingTop: "6vh",
+            zIndex: 60,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: `linear-gradient(180deg, #141822 0%, ${DARK_INK} 100%)`,
+              borderRadius: 16,
+              width: 720,
+              maxWidth: "92vw",
+              maxHeight: "86vh",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 0 0 1px rgba(255,255,255,0.06), 0 24px 64px rgba(0,0,0,0.5)",
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              padding: "24px 32px 16px 32px",
+              borderBottom: "1px solid rgba(255,255,255,0.04)",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 12,
+            }}>
+              <h2 style={{
+                fontSize: 22, fontWeight: 700, color: "rgba(255,255,255,0.95)",
+                margin: 0, flex: 1, lineHeight: 1.3,
+              }}>
+                {title}
+              </h2>
+              <button
+                onClick={() => setReadingMode(false)}
+                title="Close reading mode (Esc)"
+                style={{
+                  width: 28, height: 28, borderRadius: 7,
+                  border: "none", background: "rgba(255,255,255,0.06)",
+                  color: "rgba(255,255,255,0.3)", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 14, padding: 0, flexShrink: 0,
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 14h6v6" /><path d="M20 10h-6V4" />
+                  <path d="M14 10l7-7" /><path d="M3 21l7-7" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content — scrollable, rendered markdown or editable */}
+            <div style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "24px 32px 32px 32px",
+            }}>
+              {descPreview || hasMarkdown ? (
+                <div style={{
+                  fontSize: 15,
+                  color: "rgba(255,255,255,0.8)",
+                  lineHeight: 1.7,
+                  userSelect: "text",
+                }}>
+                  {renderMarkdown(description)}
+                </div>
+              ) : (
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  style={{
+                    width: "100%",
+                    minHeight: 300,
+                    background: "transparent",
+                    border: "none",
+                    fontSize: 15,
+                    color: "rgba(255,255,255,0.8)",
+                    outline: "none",
+                    resize: "none",
+                    lineHeight: 1.7,
+                    fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Footer with edit toggle */}
+            <div style={{
+              padding: "12px 32px",
+              borderTop: "1px solid rgba(255,255,255,0.04)",
+              background: "rgba(0,0,0,0.1)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}>
+              <button
+                onClick={() => setDescPreview(false)}
+                style={{
+                  padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                  background: !descPreview ? "rgba(255,255,255,0.08)" : "transparent",
+                  border: "none", color: !descPreview ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.25)",
+                  cursor: "pointer",
+                }}
+              >Edit</button>
+              <button
+                onClick={() => setDescPreview(true)}
+                style={{
+                  padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                  background: descPreview ? "rgba(255,255,255,0.08)" : "transparent",
+                  border: "none", color: descPreview ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.25)",
+                  cursor: "pointer",
+                }}
+              >Read</button>
+              <div style={{ flex: 1 }} />
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.15)" }}>
+                Esc to close
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes wizard-spin {
