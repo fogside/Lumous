@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Board, Card, Meta, DARK_INK, FocusSession, CardRef } from "../lib/types";
 import { useTodayBoard, AggregatedCard } from "../hooks/useTodayBoard";
 import { WizardCelebration } from "./WizardCelebration";
+import { BackgroundWisps } from "./BackgroundWisps";
 
 interface Props {
   boards: Record<string, Board>;
@@ -392,6 +393,8 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
         pointerEvents: "none",
       }} />
 
+      <BackgroundWisps boardColor="#2B3A55" isLight={false} visible={true} />
+
       {/* Header — matches BoardView pattern: title + wand on one line */}
       <div onMouseDown={startWindowDrag} style={{ padding: "44px 48px 16px 48px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -647,8 +650,8 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
-        .move-btn { opacity: 0; }
-        div:hover > .move-btn { opacity: 1; }
+        .move-btn { opacity: 0; pointer-events: none; }
+        div:hover > .move-btn { opacity: 1; pointer-events: auto; }
       `}</style>
     </div>
   );
