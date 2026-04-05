@@ -282,7 +282,20 @@ export default function App() {
               refreshBoard(boardData);
             } catch (e) { console.error(e); }
           }}
-          onDelete={() => {}}
+          onDelete={async (cardId, columnId) => {
+            try {
+              await flushSave();
+              const { invoke } = await import("@tauri-apps/api/core");
+              const boardJson = await invoke<string>("load_board", { id: todayEditingCard.boardId });
+              const boardData = JSON.parse(boardJson);
+              delete boardData.cards[cardId];
+              for (const col of boardData.columns) {
+                col.cardIds = col.cardIds.filter((id: string) => id !== cardId);
+              }
+              await invoke("save_board", { id: todayEditingCard.boardId, data: JSON.stringify(boardData, null, 2) });
+              refreshBoard(boardData);
+            } catch (e) { console.error(e); }
+          }}
           onClose={() => setTodayEditingCard(null)}
           onStartResearch={(card, context) => startResearch(card, context, todayEditingCard.boardId)}
         />

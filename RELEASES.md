@@ -1,5 +1,27 @@
 # Releases
 
+## v2.0.0 — Today Board & Focus Sessions
+
+*2026-04-05*
+
+- **⚡ Today Board** — aggregates Today + In Progress tasks from ALL boards into one execution view
+- **Focus sessions** — group tasks into 25/50/75 min blocks organized by Morning, After Lunch, Evening
+- **Wizard session planning** — open the wizard on the Today Board and ask it to plan your day. Iteratively refine sessions via chat
+- **Click-to-assign** — select a task, click a session to move it there. Reorder with ▲▼ buttons
+- **Session lifecycle** — Start (moves cards to In Progress), complete tasks with strikethrough, undo completions, wizard celebration on session complete
+- **Card modal from Today Board** — click any task to edit, research, or delete it on its source board
+- **Background research from Today Board** — research works across boards via disk-based fallback
+- **20+ bug fixes** — stale closures, settings race conditions, missing board refreshes, data consistency across 7 audit passes
+- **Visual polish** — warm gradient background, gold/purple/olive glows, time-of-day emojis, olive/indigo/copper session badges
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v1.9.1 — Wizard Web Research
 
 *2026-04-04*
