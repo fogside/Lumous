@@ -123,6 +123,7 @@ export default function App() {
             }}
             onToggleWizard={() => setShowWizard((v) => !v)}
             showWisps={showWisps}
+            refreshBoard={refreshBoard}
           />
         ) : shadowBoardId && allBoards[shadowBoardId] ? (
           <ShadowBoardView

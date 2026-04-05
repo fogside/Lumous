@@ -32,6 +32,7 @@ export function useTodayBoard(
   meta: Meta | null,
   updateSettings: (settings: Partial<Meta["settings"]>) => void,
   flushSave?: () => Promise<void>,
+  refreshBoard?: (board: Board) => void,
 ) {
   const today = new Date().toISOString().slice(0, 10);
   const sessions = meta?.settings.todaySessions || [];
@@ -176,6 +177,11 @@ export function useTodayBoard(
     [activeSessions, saveSessions],
   );
 
+  // Read fresh sessions from meta to avoid stale closure issues in async callbacks
+  const getLatestSessions = useCallback((): FocusSession[] => {
+    return meta?.settings.todaySessions || [];
+  }, [meta]);
+
   // Complete a card on source board — keep in session but mark as done
   const completeCard = useCallback(
     async (cardRef: CardRef) => {
@@ -184,16 +190,13 @@ export function useTodayBoard(
         const boardJson = await invoke<string>("load_board", { id: cardRef.boardId });
         const boardData = JSON.parse(boardJson);
         const card = boardData.cards[cardRef.cardId];
-        if (!card || card.completedAt) return; // already completed
+        if (!card || card.completedAt) return;
 
-        // Move from current column to completed on source board
         for (const col of boardData.columns) {
           col.cardIds = col.cardIds.filter((id: string) => id !== cardRef.cardId);
         }
         const completedCol = boardData.columns.find((c: { id: string }) => c.id === "completed");
-        if (completedCol) {
-          completedCol.cardIds.unshift(cardRef.cardId);
-        }
+        if (completedCol) completedCol.cardIds.unshift(cardRef.cardId);
         const now = new Date().toISOString();
         card.completedAt = now;
         if (!boardData.completionLog) boardData.completionLog = [];
@@ -204,9 +207,11 @@ export function useTodayBoard(
         }
 
         await invoke("save_board", { id: cardRef.boardId, data: JSON.stringify(boardData, null, 2) });
+        if (refreshBoard) refreshBoard(boardData as Board);
 
-        // Mark as completed in session (keep in session, don't remove)
-        const updated = activeSessions.map((s) => {
+        // Mark as completed in session — read FRESH sessions to avoid stale closure
+        const fresh = getLatestSessions();
+        const updated = fresh.map((s) => {
           if (s.cardRefs.some((r) => r.cardId === cardRef.cardId)) {
             const completed = new Set(s.completedCardIds || []);
             completed.add(cardRef.cardId);
@@ -219,7 +224,7 @@ export function useTodayBoard(
         console.error("Failed to complete card:", e);
       }
     },
-    [activeSessions, saveSessions, flushSave],
+    [saveSessions, flushSave, refreshBoard, getLatestSessions],
   );
 
   // Uncomplete a card — move back to "today" on source board, unmark in session
@@ -232,7 +237,6 @@ export function useTodayBoard(
         const card = boardData.cards[cardRef.cardId];
         if (!card) return;
 
-        // Move from completed back to today
         for (const col of boardData.columns) {
           col.cardIds = col.cardIds.filter((id: string) => id !== cardRef.cardId);
         }
@@ -241,9 +245,10 @@ export function useTodayBoard(
         card.completedAt = null;
 
         await invoke("save_board", { id: cardRef.boardId, data: JSON.stringify(boardData, null, 2) });
+        if (refreshBoard) refreshBoard(boardData as Board);
 
-        // Remove from completed in session
-        const updated = activeSessions.map((s) => {
+        const fresh = getLatestSessions();
+        const updated = fresh.map((s) => {
           if (s.completedCardIds?.includes(cardRef.cardId)) {
             return { ...s, completedCardIds: s.completedCardIds.filter((id) => id !== cardRef.cardId) };
           }
@@ -254,20 +259,20 @@ export function useTodayBoard(
         console.error("Failed to uncomplete card:", e);
       }
     },
-    [activeSessions, saveSessions, flushSave],
+    [saveSessions, flushSave, refreshBoard, getLatestSessions],
   );
 
   // Start a session — move all cards to "in-progress" on their source boards
   const startSession = useCallback(
     async (sessionId: string) => {
       if (flushSave) await flushSave();
-      const session = activeSessions.find((s) => s.id === sessionId);
+      const fresh = getLatestSessions();
+      const session = fresh.find((s) => s.id === sessionId);
       if (!session) return;
 
-      // Group card refs by board for efficient batch updates
       const byBoard = new Map<string, string[]>();
       for (const ref of session.cardRefs) {
-        if (session.completedCardIds?.includes(ref.cardId)) continue; // skip already completed
+        if (session.completedCardIds?.includes(ref.cardId)) continue;
         const list = byBoard.get(ref.boardId) || [];
         list.push(ref.cardId);
         byBoard.set(ref.boardId, list);
@@ -279,28 +284,27 @@ export function useTodayBoard(
           const boardData = JSON.parse(boardJson);
 
           for (const cardId of cardIds) {
-            // Remove from current column
             for (const col of boardData.columns) {
               col.cardIds = col.cardIds.filter((id: string) => id !== cardId);
             }
-            // Add to in-progress
             const ipCol = boardData.columns.find((c: { id: string }) => c.id === "in-progress");
             if (ipCol) ipCol.cardIds.unshift(cardId);
           }
 
           await invoke("save_board", { id: boardId, data: JSON.stringify(boardData, null, 2) });
+          if (refreshBoard) refreshBoard(boardData as Board);
         } catch (e) {
           console.error("Failed to start session cards:", e);
         }
       }
 
-      // Mark session as started
-      const updated = activeSessions.map((s) =>
+      const freshAfter = getLatestSessions();
+      const updated = freshAfter.map((s) =>
         s.id === sessionId ? { ...s, started: true } : s
       );
       saveSessions(updated);
     },
-    [activeSessions, saveSessions],
+    [saveSessions, flushSave, refreshBoard, getLatestSessions],
   );
 
   // Check if all cards in a session are completed
