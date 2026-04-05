@@ -39,7 +39,7 @@ const TIME_OF_DAY_LABELS: Record<string, { title: string; color: string; emoji: 
 };
 
 const DURATION_COLORS: Record<number, string> = {
-  25: "rgba(130,140,80,0.5)",    // olive green
+  25: "rgba(85,107,47,0.55)",    // olive green (#556B2F)
   50: "rgba(110,90,180,0.45)",   // ultraviolet
   75: "rgba(180,138,192,0.45)",  // plum
 };
@@ -90,9 +90,9 @@ function SessionCard({
       style={{
         borderRadius: 14,
         background: isComplete
-          ? "rgba(100,200,100,0.04)"
+          ? "rgba(85,107,47,0.08)"
           : hasSelected ? "rgba(180,138,192,0.04)" : "rgba(255,255,255,0.02)",
-        border: `1px solid ${isComplete ? "rgba(100,200,100,0.12)" : hasSelected ? "rgba(180,138,192,0.15)" : "rgba(255,255,255,0.04)"}`,
+        border: `1px solid ${isComplete ? "rgba(85,107,47,0.25)" : hasSelected ? "rgba(180,138,192,0.15)" : "rgba(255,255,255,0.04)"}`,
         padding: "14px 16px",
         marginBottom: 10,
         transition: "all 0.15s",
@@ -103,7 +103,7 @@ function SessionCard({
       {/* Session header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
         {isComplete ? (
-          <span style={{ fontSize: 12, color: "rgba(100,200,100,0.7)" }}>{"✓"}</span>
+          <span style={{ fontSize: 12, color: "rgba(140,170,80,0.9)" }}>{"✓"}</span>
         ) : (
           <span style={{
             fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
@@ -115,10 +115,10 @@ function SessionCard({
         )}
         <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", flex: 1 }}>
           {isComplete ? (
-            <span style={{ color: "rgba(100,200,100,0.6)" }}>Session complete!</span>
+            <span style={{ color: "rgba(140,170,80,0.8)" }}>Session complete!</span>
           ) : (
             <>
-              {doneCount > 0 && <span style={{ color: "rgba(100,200,100,0.5)" }}>{doneCount}/{cards.length} done · </span>}
+              {doneCount > 0 && <span style={{ color: "rgba(140,170,80,0.6)" }}>{doneCount}/{cards.length} done · </span>}
               {formatTime(totalMin)}
               {totalMin > session.duration && (
                 <span style={{ color: "rgba(220,80,80,0.6)", marginLeft: 4 }}>
@@ -135,8 +135,8 @@ function SessionCard({
             data-no-drag
             style={{
               fontSize: 10, fontWeight: 600, padding: "3px 10px", borderRadius: 5,
-              border: "none", background: "rgba(124,196,138,0.12)",
-              color: "rgba(124,196,138,0.8)", cursor: "pointer",
+              border: "none", background: "rgba(85,107,47,0.2)",
+              color: "rgba(140,170,80,0.9)", cursor: "pointer",
               transition: "all 0.15s",
             }}
           >
@@ -144,7 +144,7 @@ function SessionCard({
           </button>
         )}
         {session.started && !isComplete && (
-          <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(124,196,138,0.4)" }}>In progress</span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(140,170,80,0.5)" }}>In progress</span>
         )}
         <button
           onClick={() => onRemoveSession(session.id)}
@@ -195,9 +195,9 @@ function SessionCard({
                 onClick={(e) => { e.stopPropagation(); onUncomplete({ boardId: ac.boardId, cardId: ac.card.id }); }}
                 data-no-drag title="Undo completion"
                 style={{
-                  width: 16, height: 16, borderRadius: 5, background: "rgba(100,200,100,0.2)",
+                  width: 16, height: 16, borderRadius: 5, background: "rgba(85,107,47,0.35)",
                   border: "none", display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0, fontSize: 10, color: "rgba(100,200,100,0.8)",
+                  flexShrink: 0, fontSize: 10, color: "rgba(140,170,80,0.9)",
                   cursor: "pointer", padding: 0,
                 }}
               >{"✓"}</button>
@@ -211,7 +211,7 @@ function SessionCard({
                   background: "transparent", cursor: "pointer",
                   flexShrink: 0, padding: 0, transition: "all 0.15s",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(100,200,100,0.5)"; e.currentTarget.style.background = "rgba(100,200,100,0.1)"; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(140,170,80,0.6)"; e.currentTarget.style.background = "rgba(85,107,47,0.15)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.background = "transparent"; }}
               />
             )}
