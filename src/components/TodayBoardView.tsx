@@ -368,30 +368,40 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: `linear-gradient(to left, #252035 0%, ${DARK_INK} 65%)`,
+        background: `linear-gradient(135deg, ${DARK_INK} 0%, #1e1a2e 35%, #2a2440 65%, #302848 100%)`,
         position: "relative",
         overflow: "hidden",
       }}
     >
-      {/* Decorative glow — top-right corner warmth */}
+      {/* Decorative glows */}
       <div style={{
         position: "absolute",
-        top: -60,
-        right: -60,
-        width: 300,
-        height: 300,
+        top: -80,
+        right: -40,
+        width: 400,
+        height: 400,
         borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(180,138,192,0.08) 0%, transparent 70%)",
+        background: "radial-gradient(circle, rgba(180,138,192,0.12) 0%, transparent 65%)",
         pointerEvents: "none",
       }} />
       <div style={{
         position: "absolute",
-        top: 40,
-        right: 80,
-        width: 200,
-        height: 200,
+        top: 60,
+        right: 120,
+        width: 250,
+        height: 250,
         borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(224,197,90,0.05) 0%, transparent 70%)",
+        background: "radial-gradient(circle, rgba(224,197,90,0.07) 0%, transparent 65%)",
+        pointerEvents: "none",
+      }} />
+      <div style={{
+        position: "absolute",
+        bottom: -100,
+        left: "30%",
+        width: 350,
+        height: 350,
+        borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(110,90,160,0.06) 0%, transparent 65%)",
         pointerEvents: "none",
       }} />
 
