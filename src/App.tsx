@@ -283,6 +283,7 @@ export default function App() {
           }}
           onDelete={() => {}}
           onClose={() => setTodayEditingCard(null)}
+          onStartResearch={(card, context) => startResearch(card, context, todayEditingCard.boardId)}
         />
       )}
 
