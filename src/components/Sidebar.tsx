@@ -127,7 +127,7 @@ export function Sidebar({
               fontSize: 16,
             }}
           >
-            {"🎩"}
+            {"⚡"}
           </button>
           <div style={{ width: 24, borderBottom: "1px solid rgba(255,255,255,0.06)" }} />
           {boardOrder.map((id) => {
@@ -250,7 +250,7 @@ export function Sidebar({
             marginBottom: 4,
           }}
         >
-          <span style={{ fontSize: 16, flexShrink: 0 }}>{"🎩"}</span>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>{"⚡"}</span>
           <span style={{ fontSize: 15, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
             Today
           </span>

@@ -358,7 +358,7 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
       {/* Header */}
       <div onMouseDown={startWindowDrag} style={{ padding: "44px 48px 20px 48px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 26 }}>{"🎩"}</span>
+          <span style={{ fontSize: 26 }}>{"⚡"}</span>
           <h1 style={{ fontSize: 28, fontWeight: 700, color: "rgba(255,255,255,0.9)", margin: 0 }}>
             Today
           </h1>
