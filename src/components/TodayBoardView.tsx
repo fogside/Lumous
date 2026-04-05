@@ -350,41 +350,28 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: DARK_INK,
+        background: `linear-gradient(160deg, #1a1510 0%, ${DARK_INK} 40%, #0e1118 100%)`,
         position: "relative",
         overflow: "hidden",
       }}
     >
-      {/* Header */}
-      <div onMouseDown={startWindowDrag} style={{ padding: "44px 48px 20px 48px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 26 }}>{"⚡"}</span>
+      {/* Header — matches BoardView pattern: title + wand on one line */}
+      <div onMouseDown={startWindowDrag} style={{ padding: "44px 48px 16px 48px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <h1 style={{ fontSize: 28, fontWeight: 700, color: "rgba(255,255,255,0.9)", margin: 0 }}>
-            Today
+            {"⚡"} Today
           </h1>
-          <span style={{ fontSize: 11, color: "rgba(224,197,90,0.3)", fontWeight: 500, alignSelf: "flex-end", marginBottom: 4 }}>
-            {new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
-          </span>
-        </div>
-        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.25)", display: "flex", gap: 16 }}>
-            <span>{totalCards} task{totalCards !== 1 ? "s" : ""}</span>
-            <span>{formatTime(totalMin)} total</span>
-            {totalPlannedMin > 0 && <span>{formatTime(totalPlannedMin)} planned</span>}
-          </span>
-          <div style={{ flex: 1 }} />
           {onToggleWizard && (
             <button
               onClick={onToggleWizard}
               data-no-drag
-              title="Ask the Wizard to plan your day"
+              title="Ask the Wizard"
               style={{
                 width: 30, height: 30, borderRadius: 8,
                 border: "none", background: "transparent",
-                color: "rgba(255,255,255,0.25)", cursor: "pointer",
+                color: "rgba(224,197,90,0.35)", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s", flexShrink: 0, opacity: 0.6,
-                fontSize: 16,
+                transition: "all 0.15s", flexShrink: 0,
               }}
               className="wand-btn"
             >
@@ -396,6 +383,15 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
               </svg>
             </button>
           )}
+        </div>
+        <div style={{ marginTop: 4, fontSize: 12, color: "rgba(224,197,90,0.35)", fontWeight: 500 }}>
+          {new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
+        </div>
+        <div style={{ marginTop: 8, fontSize: 13, color: "rgba(255,255,255,0.2)", display: "flex", gap: 16 }}>
+          <span>{totalCards} task{totalCards !== 1 ? "s" : ""}</span>
+          <span>{formatTime(totalMin)} total</span>
+          {totalPlannedMin > 0 && <span style={{ color: "rgba(224,197,90,0.3)" }}>{formatTime(totalPlannedMin)} planned</span>}
+          {sessions.length > 0 && <span>{sessions.length} session{sessions.length !== 1 ? "s" : ""}</span>}
         </div>
       </div>
 
