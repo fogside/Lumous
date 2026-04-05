@@ -1,7 +1,8 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Board, Card, Meta, DARK_INK, FocusSession, CardRef } from "../lib/types";
 import { useTodayBoard, AggregatedCard } from "../hooks/useTodayBoard";
+import { WizardCelebration } from "./WizardCelebration";
 
 interface Props {
   boards: Record<string, Board>;
@@ -301,6 +302,20 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
   } = useTodayBoard(boards, meta, updateSettings, flushSave);
 
   const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null);
+  const [wizardKey, setWizardKey] = useState(0);
+  const [showCelebration, setShowCelebration] = useState(false);
+
+  // Trigger wizard celebration when a session completes
+  const completedCount = sessions.filter((s) => isSessionComplete(s)).length;
+  const prevCompletedRef = useRef(completedCount);
+  useEffect(() => {
+    if (completedCount > prevCompletedRef.current) {
+      setWizardKey((k) => k + 1);
+      setShowCelebration(true);
+      setTimeout(() => setShowCelebration(false), 3000);
+    }
+    prevCompletedRef.current = completedCount;
+  }, [completedCount]);
 
   const handleSelectCard = useCallback((ac: AggregatedCard) => {
     setSelectedCard((prev) =>
@@ -624,6 +639,8 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
           </div>
         )}
       </div>
+
+      <WizardCelebration key={wizardKey} visible={showCelebration} boardColor="#2B3A55" />
 
       <style>{`
         @keyframes wizard-spin {
