@@ -38,10 +38,10 @@ const TIME_OF_DAY_LABELS: Record<string, { title: string; color: string; emoji: 
   evening: { title: "Evening", color: "rgba(180,138,192,0.4)", emoji: "🌙" },
 };
 
-const DURATION_COLORS: Record<number, { bg: string; text: string }> = {
-  25: { bg: "rgba(180,160,120,0.12)", text: "rgba(210,190,140,0.8)" },   // warm amber
-  50: { bg: "rgba(160,140,190,0.10)", text: "rgba(190,170,220,0.7)" },   // soft indigo
-  75: { bg: "rgba(180,120,170,0.10)", text: "rgba(210,150,200,0.7)" },   // warm violet
+const DURATION_COLORS: Record<number, string> = {
+  25: "rgba(130,140,80,0.5)",    // olive green
+  50: "rgba(110,90,180,0.45)",   // ultraviolet
+  75: "rgba(180,138,192,0.45)",  // plum
 };
 
 // Selected card state for click-to-assign (instead of HTML5 DnD which doesn't work in WKWebView)
@@ -107,8 +107,8 @@ function SessionCard({
         ) : (
           <span style={{
             fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
-            background: DURATION_COLORS[session.duration]?.bg || "rgba(255,255,255,0.08)",
-            color: DURATION_COLORS[session.duration]?.text || "rgba(255,255,255,0.6)",
+            background: DURATION_COLORS[session.duration] || "rgba(255,255,255,0.1)",
+            color: "rgba(255,255,255,0.85)",
           }}>
             {session.duration}min
           </span>
