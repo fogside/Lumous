@@ -39,9 +39,9 @@ const TIME_OF_DAY_LABELS: Record<string, { title: string; color: string; emoji: 
 };
 
 const DURATION_COLORS: Record<number, { bg: string; text: string }> = {
-  25: { bg: "rgba(124,196,138,0.12)", text: "rgba(150,220,160,0.8)" },   // soft sage
-  50: { bg: "rgba(140,180,220,0.10)", text: "rgba(160,200,240,0.7)" },   // dreamy blue
-  75: { bg: "rgba(200,160,220,0.10)", text: "rgba(210,180,230,0.7)" },   // gentle plum
+  25: { bg: "rgba(180,160,120,0.12)", text: "rgba(210,190,140,0.8)" },   // warm amber
+  50: { bg: "rgba(160,140,190,0.10)", text: "rgba(190,170,220,0.7)" },   // soft indigo
+  75: { bg: "rgba(180,120,170,0.10)", text: "rgba(210,150,200,0.7)" },   // warm violet
 };
 
 // Selected card state for click-to-assign (instead of HTML5 DnD which doesn't work in WKWebView)
