@@ -41,15 +41,29 @@ export function useTodayBoard(
   // Reset sessions if date changed
   const activeSessions = sessionDate === today ? sessions : [];
 
-  // Aggregate all today + in-progress cards from all boards
+  // Collect card IDs that are marked completed in sessions (need to include from "completed" column)
+  const sessionCompletedIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const s of activeSessions) {
+      for (const id of (s.completedCardIds || [])) ids.add(id);
+    }
+    return ids;
+  }, [activeSessions]);
+
+  // Aggregate all today + in-progress cards, plus completed cards still referenced by sessions
   const allCards = useMemo<AggregatedCard[]>(() => {
     const result: AggregatedCard[] = [];
+    const seen = new Set<string>();
     for (const board of Object.values(boards)) {
       for (const col of board.columns) {
-        if (col.id !== "today" && col.id !== "in-progress") continue;
+        if (col.id !== "today" && col.id !== "in-progress" && col.id !== "completed") continue;
         for (const cardId of col.cardIds) {
+          if (seen.has(cardId)) continue;
           const card = board.cards[cardId];
           if (!card || card.proposed) continue;
+          // Include today/in-progress cards, plus completed cards that are in a session
+          if (col.id === "completed" && !sessionCompletedIds.has(cardId)) continue;
+          seen.add(cardId);
           result.push({
             card,
             boardId: board.id,
@@ -61,7 +75,7 @@ export function useTodayBoard(
       }
     }
     return result;
-  }, [boards]);
+  }, [boards, sessionCompletedIds]);
 
   // Build set of card IDs that are assigned to sessions
   const plannedCardIds = useMemo(() => {
