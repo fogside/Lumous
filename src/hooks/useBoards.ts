@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Board, Meta, createBoard } from "../lib/types";
 import { loadMeta, saveMeta, loadBoard, saveBoard, deleteBoardFile } from "../lib/storage";
 
@@ -113,14 +113,26 @@ export function useBoards() {
     });
   }, []);
 
+  // Read fresh meta from disk before merging to prevent lost-update races
+  // (e.g., wizard saving memories while Today Board saves sessions concurrently)
+  const settingsLockRef = useRef(false);
   const updateSettings = useCallback(
     async (settings: Partial<Meta["settings"]>) => {
-      if (!meta) return;
-      const newMeta = { ...meta, settings: { ...meta.settings, ...settings } };
-      await saveMeta(newMeta);
-      setMeta(newMeta);
+      // Simple lock to serialize concurrent calls
+      while (settingsLockRef.current) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      settingsLockRef.current = true;
+      try {
+        const freshMeta = await loadMeta();
+        const newMeta = { ...freshMeta, settings: { ...freshMeta.settings, ...settings } };
+        await saveMeta(newMeta);
+        setMeta(newMeta);
+      } finally {
+        settingsLockRef.current = false;
+      }
     },
-    [meta]
+    []
   );
 
   return {

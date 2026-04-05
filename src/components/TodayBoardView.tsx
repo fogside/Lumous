@@ -434,6 +434,16 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
         background: "radial-gradient(circle, rgba(230,200,100,0.04) 0%, transparent 55%)",
         pointerEvents: "none",
       }} />
+      <div style={{
+        position: "absolute",
+        bottom: 60,
+        right: "20%",
+        width: 200,
+        height: 200,
+        borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(85,107,47,0.06) 0%, transparent 60%)",
+        pointerEvents: "none",
+      }} />
 
       <BackgroundWisps boardColor="#2B3A55" isLight={false} visible={showWisps} />
 

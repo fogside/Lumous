@@ -272,6 +272,7 @@ export default function App() {
           goals={allBoards[todayEditingCard.boardId]?.goals}
           onSave={async (updatedCard) => {
             try {
+              await flushSave(); // prevent stale useBoard auto-save from overwriting
               const { invoke } = await import("@tauri-apps/api/core");
               const boardJson = await invoke<string>("load_board", { id: todayEditingCard.boardId });
               const boardData = JSON.parse(boardJson);
