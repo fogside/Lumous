@@ -30,8 +30,8 @@ function formatTime(min: number): string {
 }
 
 const TIME_OF_DAY_LABELS: Record<string, { title: string; color: string; emoji: string }> = {
-  morning: { title: "Morning", color: "rgba(224,197,90,0.5)", emoji: "🌅" },
-  afternoon: { title: "After Lunch", color: "rgba(220,160,90,0.4)", emoji: "☀️" },
+  morning: { title: "Morning", color: "rgba(224,197,90,0.5)", emoji: "☀️" },
+  afternoon: { title: "After Lunch", color: "rgba(220,160,90,0.4)", emoji: "🍵" },
   evening: { title: "Evening", color: "rgba(180,138,192,0.4)", emoji: "🌙" },
 };
 
