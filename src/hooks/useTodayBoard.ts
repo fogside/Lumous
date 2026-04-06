@@ -41,28 +41,30 @@ export function useTodayBoard(
   // Reset sessions if date changed
   const activeSessions = sessionDate === today ? sessions : [];
 
-  // Collect card IDs that are marked completed in sessions (need to include from "completed" column)
-  const sessionCompletedIds = useMemo(() => {
+  // Collect ALL card IDs referenced by any session (for including completed cards)
+  const sessionCardIds = useMemo(() => {
     const ids = new Set<string>();
     for (const s of activeSessions) {
-      for (const id of (s.completedCardIds || [])) ids.add(id);
+      for (const ref of s.cardRefs) ids.add(ref.cardId);
     }
     return ids;
   }, [activeSessions]);
 
-  // Aggregate all today + in-progress cards, plus completed cards still referenced by sessions
+  // Aggregate all today + in-progress cards, plus ANY card referenced by a session
+  // (even if it moved to completed or another column on the source board)
   const allCards = useMemo<AggregatedCard[]>(() => {
     const result: AggregatedCard[] = [];
     const seen = new Set<string>();
     for (const board of Object.values(boards)) {
       for (const col of board.columns) {
-        if (col.id !== "today" && col.id !== "in-progress" && col.id !== "completed") continue;
         for (const cardId of col.cardIds) {
           if (seen.has(cardId)) continue;
           const card = board.cards[cardId];
           if (!card || card.proposed) continue;
-          // Include today/in-progress cards, plus completed cards that are in a session
-          if (col.id === "completed" && !sessionCompletedIds.has(cardId)) continue;
+          // Include if: in today/in-progress, OR referenced by a session
+          const isRelevantColumn = col.id === "today" || col.id === "in-progress";
+          const isInSession = sessionCardIds.has(cardId);
+          if (!isRelevantColumn && !isInSession) continue;
           seen.add(cardId);
           result.push({
             card,
@@ -75,7 +77,7 @@ export function useTodayBoard(
       }
     }
     return result;
-  }, [boards, sessionCompletedIds]);
+  }, [boards, sessionCardIds]);
 
   // Build card → column map across all boards for sync detection
   const cardColumnMap = useMemo(() => {
@@ -90,64 +92,11 @@ export function useTodayBoard(
     return map;
   }, [boards]);
 
-  // Build set of card IDs that are assigned to sessions
-  const plannedCardIds = useMemo(() => {
-    const set = new Set<string>();
-    for (const s of activeSessions) {
-      for (const ref of s.cardRefs) set.add(ref.cardId);
-    }
-    return set;
-  }, [activeSessions]);
-
-  // Cards not in any session
-  const unplanned = useMemo(
-    () => allCards.filter((ac) => !plannedCardIds.has(ac.card.id)),
-    [allCards, plannedCardIds],
-  );
-
-  // Calculate totals
-  const totalPlannedMin = useMemo(() => {
-    let total = 0;
-    for (const s of activeSessions) {
-      for (const ref of s.cardRefs) {
-        const ac = allCards.find((a) => a.card.id === ref.cardId);
-        if (ac) total += parseMinutes(ac.card.timeEstimate);
-      }
-    }
-    return total;
-  }, [activeSessions, allCards]);
-
-  const totalUnplannedMin = useMemo(
-    () => unplanned.reduce((sum, ac) => sum + parseMinutes(ac.card.timeEstimate), 0),
-    [unplanned],
-  );
-
-  // Persist sessions to meta
-  const saveSessions = useCallback(
-    (newSessions: FocusSession[]) => {
-      updateSettings({ todaySessions: newSessions, todayDate: today });
-    },
-    [updateSettings, today],
-  );
-
-  // Auto-sync sessions with source board state:
-  // - Remove cards moved to "todo" (no longer a today task)
-  // - Auto-mark cards completed on source board
-  // - Auto-unmark cards moved back to today/in-progress from completed
-  // Runs whenever boards change (cardColumnMap) or sessions change
-  const lastSyncHashRef = useRef("");
-  useEffect(() => {
-    if (activeSessions.length === 0) return;
-
-    // Build a hash of current state to prevent infinite loops
-    const stateHash = activeSessions.map((s) =>
-      `${s.id}:${s.cardRefs.map((r) => r.cardId).join(",")}:${(s.completedCardIds || []).join(",")}`
-    ).join("|") + "||" + [...cardColumnMap.entries()].map(([k, v]) => `${k}=${v}`).join(",");
-
-    if (stateHash === lastSyncHashRef.current) return;
-
+  // Compute corrected sessions: sync with source board column state
+  const syncedSessions = useMemo(() => {
+    if (activeSessions.length === 0) return activeSessions;
     let changed = false;
-    const synced = activeSessions.map((s) => {
+    const result = activeSessions.map((s) => {
       const completed = new Set(s.completedCardIds || []);
       const newCompleted = new Set(completed);
       const newRefs = s.cardRefs.filter((ref) => {
@@ -173,18 +122,60 @@ export function useTodayBoard(
       }
       return s;
     });
+    return changed ? result : activeSessions;
+  }, [activeSessions, cardColumnMap]);
 
-    if (changed) {
-      // Update hash BEFORE saving to prevent re-entry
-      const newHash = synced.map((s) =>
-        `${s.id}:${s.cardRefs.map((r) => r.cardId).join(",")}:${(s.completedCardIds || []).join(",")}`
-      ).join("|") + "||" + [...cardColumnMap.entries()].map(([k, v]) => `${k}=${v}`).join(",");
-      lastSyncHashRef.current = newHash;
-      saveSessions(synced);
-    } else {
-      lastSyncHashRef.current = stateHash;
+  // Build set of card IDs that are assigned to sessions
+  const plannedCardIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of syncedSessions) {
+      for (const ref of s.cardRefs) set.add(ref.cardId);
     }
-  }, [activeSessions, cardColumnMap, saveSessions]);
+    return set;
+  }, [syncedSessions]);
+
+  // Cards not in any session
+  const unplanned = useMemo(
+    () => allCards.filter((ac) => !plannedCardIds.has(ac.card.id)),
+    [allCards, plannedCardIds],
+  );
+
+  // Calculate totals
+  const totalPlannedMin = useMemo(() => {
+    let total = 0;
+    for (const s of syncedSessions) {
+      for (const ref of s.cardRefs) {
+        const ac = allCards.find((a) => a.card.id === ref.cardId);
+        if (ac) total += parseMinutes(ac.card.timeEstimate);
+      }
+    }
+    return total;
+  }, [syncedSessions, allCards]);
+
+  const totalUnplannedMin = useMemo(
+    () => unplanned.reduce((sum, ac) => sum + parseMinutes(ac.card.timeEstimate), 0),
+    [unplanned],
+  );
+
+  // Persist sessions to meta
+  const saveSessions = useCallback(
+    (newSessions: FocusSession[]) => {
+      updateSettings({ todaySessions: newSessions, todayDate: today });
+    },
+    [updateSettings, today],
+  );
+
+  // Auto-sync sessions with source board state:
+  // - Remove cards moved to "todo" (no longer a today task)
+  // - Auto-mark cards completed on source board
+  // - Auto-unmark cards moved back to today/in-progress from completed
+  //
+  // Persist synced sessions to meta if they differ from what's stored
+  useEffect(() => {
+    if (syncedSessions !== activeSessions && syncedSessions.length > 0) {
+      saveSessions(syncedSessions);
+    }
+  }, [syncedSessions, activeSessions, saveSessions]);
 
   const setSessions = useCallback(
     (newSessions: FocusSession[]) => {
@@ -403,7 +394,7 @@ export function useTodayBoard(
   return {
     allCards,
     unplanned,
-    sessions: activeSessions,
+    sessions: syncedSessions,
     totalPlannedMin,
     totalUnplannedMin,
     setSessions,
