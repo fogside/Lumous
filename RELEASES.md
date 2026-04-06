@@ -1,5 +1,24 @@
 # Releases
 
+## v2.0.1 — Cross-Board Sync & Polish
+
+*2026-04-06*
+
+- **Cross-board data consistency** — changes on source boards (card completions, moves) now sync correctly to the Today Board and back. No more data reverting when switching boards
+- **Reading mode** — expand any card description to fullscreen with rendered markdown, clickable links, and edit/read toggle
+- **Clickable links** — markdown `[text](url)` and bare URLs now render as clickable links
+- **Manual time estimates** — set 5/10/15/20/30/45/50/75 min estimates directly in the card modal
+- **Session auto-sync** — cards completed/uncompleted on source boards auto-update in Today Board sessions
+- **Text selection fix** — selecting text in card modals no longer drags the window
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v2.0.0 — Today Board & Focus Sessions
 
 *2026-04-05*
