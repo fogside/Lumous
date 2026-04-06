@@ -116,6 +116,8 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
 
   return (
     <div
+      data-no-drag
+      onMouseDown={(e) => e.stopPropagation()}
       style={{
         position: "fixed",
         inset: 0,
@@ -218,7 +220,6 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
 
             {descPreview && description.trim() ? (
               <div
-                onClick={() => setDescPreview(false)}
                 style={{
                   minHeight: 80,
                   maxHeight: 300,
@@ -230,7 +231,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
                   fontSize: 14,
                   color: "rgba(255,255,255,0.75)",
                   lineHeight: 1.6,
-                  cursor: "text",
+                  userSelect: "text",
                 }}
               >
                 {renderMarkdown(description)}
