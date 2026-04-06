@@ -25,6 +25,9 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
   // Goal state (independent)
   const [goalId, setGoalId] = useState<string | undefined>(card.goalId);
 
+  // Time estimate
+  const [timeEstimate, setTimeEstimate] = useState<string | undefined>(card.timeEstimate);
+
   // Ritual state
   const [ritualEnabled, setRitualEnabled] = useState(!!card.ritual);
   const [ritualSchedule, setRitualSchedule] = useState<RitualSchedule>(
@@ -51,6 +54,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
       setDescription(card.description);
       setLabel(card.label);
       setGoalId(card.goalId);
+      setTimeEstimate(card.timeEstimate);
       setRitualEnabled(!!card.ritual);
       setRitualSchedule(card.ritual?.schedule || "daily");
       return;
@@ -58,6 +62,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
     // Same card, external update — sync fields the user hasn't touched
     if (!userEditedRef.current.has("label")) setLabel(card.label);
     if (!userEditedRef.current.has("goalId")) setGoalId(card.goalId);
+    if (!userEditedRef.current.has("timeEstimate")) setTimeEstimate(card.timeEstimate);
     if (!userEditedRef.current.has("ritual")) {
       setRitualEnabled(!!card.ritual);
       setRitualSchedule(card.ritual?.schedule || "daily");
@@ -89,6 +94,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
       description: description.trim(),
       label: label || undefined,
       goalId: goalId || undefined,
+      timeEstimate: timeEstimate || undefined,
       ritual: ritualEnabled
         ? { schedule: ritualSchedule }
         : undefined,
@@ -301,6 +307,30 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
                   title={l.name}
                 >
                   {!l.value && "×"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Time estimate */}
+          <div style={{ marginTop: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.22)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+              Time estimate
+            </div>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {[undefined, "5min", "10min", "15min", "20min", "30min", "45min", "50min", "75min"].map((est) => (
+                <button
+                  key={est || "none"}
+                  onClick={() => { userEditedRef.current.add("timeEstimate"); setTimeEstimate(est); }}
+                  style={{
+                    padding: "5px 12px", borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: "pointer",
+                    background: timeEstimate === est ? "rgba(180,138,192,0.15)" : "transparent",
+                    border: "none",
+                    color: timeEstimate === est ? "rgba(200,170,220,0.9)" : "rgba(255,255,255,0.25)",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {est || "None"}
                 </button>
               ))}
             </div>
