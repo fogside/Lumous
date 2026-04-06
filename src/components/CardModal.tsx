@@ -714,6 +714,8 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
               flex: 1,
               overflowY: "auto",
               padding: "24px 32px 32px 32px",
+              display: "flex",
+              flexDirection: "column",
             }}>
               {descPreview ? (
                 <div style={{
@@ -721,6 +723,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
                   color: "rgba(255,255,255,0.8)",
                   lineHeight: 1.7,
                   userSelect: "text",
+                  minHeight: "100%",
                 }}>
                   {renderMarkdown(description)}
                 </div>
@@ -728,9 +731,11 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  autoFocus
                   style={{
                     width: "100%",
-                    minHeight: 300,
+                    height: "100%",
+                    minHeight: "100%",
                     background: "transparent",
                     border: "none",
                     fontSize: 15,
