@@ -43,7 +43,7 @@ export default function App() {
   const {
     board, moveCard, addCard, updateCard, deleteCard, setGoals,
     acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
-    reorderColumn, setTimeEstimates, flushSave, forceResave, reloadFromDisk,
+    reorderColumn, setTimeEstimates, flushSave, forceResave, reloadFromDisk, setBoardIfMatch,
   } = useBoard(activeBoard, handleBoardChanged);
   const { syncState, syncError, sync, hasRepo } = useSync(meta, updateSettings, reloadFromDisk, flushSave, forceResave);
   const { mode } = useWindowSize();
@@ -69,13 +69,11 @@ export default function App() {
     );
   }
 
-  // Merge reducer's live board state into boards record, but ONLY when
-  // the reducer's board is the currently active board. When on Today Board
-  // or another board, the boards record (updated by refreshBoard) is the
-  // source of truth — the reducer may hold stale data from the previous board.
+  // ALWAYS merge reducer's live board state into boards record.
+  // The reducer has the freshest card/column data for whichever board it holds
+  // (even after switching to Today Board — the effect hasn't flushed yet).
   const reducerBoardId = board?.id;
-  const reducerIsActive = reducerBoardId === activeBoardId && activeBoardId !== TODAY_BOARD_ID;
-  const allBoards = reducerIsActive && reducerBoardId && boards[reducerBoardId]
+  const allBoards = reducerBoardId && boards[reducerBoardId]
     ? { ...boards, [reducerBoardId]: { ...board, title: boards[reducerBoardId].title, backgroundColor: boards[reducerBoardId].backgroundColor } }
     : boards;
 
@@ -129,6 +127,7 @@ export default function App() {
             onToggleWizard={() => setShowWizard((v) => !v)}
             showWisps={showWisps}
             refreshBoard={refreshBoard}
+            setBoardIfMatch={setBoardIfMatch}
           />
         ) : shadowBoardId && allBoards[shadowBoardId] ? (
           <ShadowBoardView

@@ -33,6 +33,7 @@ export function useTodayBoard(
   updateSettings: (settings: Partial<Meta["settings"]>) => void,
   flushSave?: () => Promise<void>,
   refreshBoard?: (board: Board) => void,
+  setBoardIfMatch?: (board: Board) => void,
 ) {
   const today = new Date().toISOString().slice(0, 10);
   const sessions = meta?.settings.todaySessions || [];
@@ -282,6 +283,7 @@ export function useTodayBoard(
 
         await invoke("save_board", { id: cardRef.boardId, data: JSON.stringify(boardData, null, 2) });
         if (refreshBoard) refreshBoard(boardData as Board);
+        if (setBoardIfMatch) setBoardIfMatch(boardData as Board);
 
         // Mark as completed in session — read FRESH sessions to avoid stale closure
         const fresh = getLatestSessions();
@@ -320,6 +322,7 @@ export function useTodayBoard(
 
         await invoke("save_board", { id: cardRef.boardId, data: JSON.stringify(boardData, null, 2) });
         if (refreshBoard) refreshBoard(boardData as Board);
+        if (setBoardIfMatch) setBoardIfMatch(boardData as Board);
 
         const fresh = getLatestSessions();
         const updated = fresh.map((s) => {
@@ -367,6 +370,7 @@ export function useTodayBoard(
 
           await invoke("save_board", { id: boardId, data: JSON.stringify(boardData, null, 2) });
           if (refreshBoard) refreshBoard(boardData as Board);
+        if (setBoardIfMatch) setBoardIfMatch(boardData as Board);
         } catch (e) {
           console.error("Failed to start session cards:", e);
         }

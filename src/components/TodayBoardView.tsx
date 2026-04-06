@@ -15,6 +15,7 @@ interface Props {
   onToggleWizard?: () => void;
   showWisps?: boolean;
   refreshBoard?: (board: Board) => void;
+  setBoardIfMatch?: (board: Board) => void;
 }
 
 function startWindowDrag(e: React.MouseEvent) {
@@ -297,12 +298,12 @@ function SessionCard({
   );
 }
 
-export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavigateToCard, onOpenCard, onToggleWizard, showWisps = true, refreshBoard }: Props) {
+export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavigateToCard, onOpenCard, onToggleWizard, showWisps = true, refreshBoard, setBoardIfMatch }: Props) {
   const {
     allCards, unplanned, sessions, totalPlannedMin, totalUnplannedMin,
     setSessions, moveCardToSession, removeCardFromSession, addSession, removeSession,
     completeCard, uncompleteCard, reorderCardInSession, startSession, isSessionComplete, parseMinutes,
-  } = useTodayBoard(boards, meta, updateSettings, flushSave, refreshBoard);
+  } = useTodayBoard(boards, meta, updateSettings, flushSave, refreshBoard, setBoardIfMatch);
 
   const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null);
   const [wizardKey, setWizardKey] = useState(0);

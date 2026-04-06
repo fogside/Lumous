@@ -251,15 +251,21 @@ export function useBoard(
     if (newId !== prevId) {
       // Flush save the previous board before switching — tracked so flushSave can await it
       clearTimeout(saveTimeout.current);
-      if (dirtyRef.current && boardRef.current) {
-        const b = boardRef.current;
-        savingPromiseRef.current = (async () => {
-          try {
-            await saveBoard(b);
-            if (b.id) lastMtimeRef.current = await getBoardMtime(b.id);
-          } catch (e) { console.error(e); }
-          savingPromiseRef.current = null;
-        })();
+      if (boardRef.current) {
+        // Push the reducer's latest state to the boards record IMMEDIATELY
+        // so the next view (e.g., Today Board) sees up-to-date data
+        onBoardChanged?.(boardRef.current);
+
+        if (dirtyRef.current) {
+          const b = boardRef.current;
+          savingPromiseRef.current = (async () => {
+            try {
+              await saveBoard(b);
+              if (b.id) lastMtimeRef.current = await getBoardMtime(b.id);
+            } catch (e) { console.error(e); }
+            savingPromiseRef.current = null;
+          })();
+        }
       }
       dirtyRef.current = false;
       prevBoardIdRef.current = newId;
@@ -474,9 +480,18 @@ export function useBoard(
     } catch { /* ignore */ }
   }, [initialBoard?.id, onBoardChanged]);
 
+  // Update the reducer's board directly (for cross-board operations like Today Board completing cards)
+  const setBoardIfMatch = useCallback((updatedBoard: Board) => {
+    if (boardRef.current?.id === updatedBoard.id) {
+      suppressSaveRef.current = true;
+      lastSetBoardRef.current = updatedBoard;
+      dispatch({ type: "SET_BOARD", board: updatedBoard });
+    }
+  }, []);
+
   return {
     board, dispatch, moveCard, addCard, updateCard, deleteCard, setGoals,
     acceptProposal, rejectProposal, acceptAllProposals, rejectAllProposals, clearHighlights,
-    reorderColumn, setTimeEstimates, flushSave, forceResave, reloadFromDisk,
+    reorderColumn, setTimeEstimates, flushSave, forceResave, reloadFromDisk, setBoardIfMatch,
   };
 }
