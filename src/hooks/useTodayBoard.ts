@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useEffect } from "react";
 import { Board, Card, CardRef, FocusSession, Meta } from "../lib/types";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -77,6 +77,19 @@ export function useTodayBoard(
     return result;
   }, [boards, sessionCompletedIds]);
 
+  // Build card → column map across all boards for sync detection
+  const cardColumnMap = useMemo(() => {
+    const map = new Map<string, string>(); // cardId → column id
+    for (const board of Object.values(boards)) {
+      for (const col of board.columns) {
+        for (const cardId of col.cardIds) {
+          map.set(cardId, col.id);
+        }
+      }
+    }
+    return map;
+  }, [boards]);
+
   // Build set of card IDs that are assigned to sessions
   const plannedCardIds = useMemo(() => {
     const set = new Set<string>();
@@ -116,6 +129,45 @@ export function useTodayBoard(
     },
     [updateSettings, today],
   );
+
+  // Auto-sync sessions with source board state:
+  // - Remove cards moved to "todo" (no longer a today task)
+  // - Auto-mark cards completed on source board
+  // - Auto-unmark cards moved back to today/in-progress from completed
+  useEffect(() => {
+    if (activeSessions.length === 0) return;
+    let changed = false;
+    const synced = activeSessions.map((s) => {
+      const completed = new Set(s.completedCardIds || []);
+      const newCompleted = new Set(completed);
+      const newRefs = s.cardRefs.filter((ref) => {
+        const col = cardColumnMap.get(ref.cardId);
+        if (!col) return true; // card not found — keep (might be loading)
+        if (col === "todo") {
+          // Card moved to Todo on source board — remove from session
+          changed = true;
+          newCompleted.delete(ref.cardId);
+          return false;
+        }
+        if (col === "completed" && !completed.has(ref.cardId)) {
+          // Card completed on source board — auto-mark in session
+          newCompleted.add(ref.cardId);
+          changed = true;
+        }
+        if ((col === "today" || col === "in-progress") && completed.has(ref.cardId)) {
+          // Card moved back from completed on source board — unmark
+          newCompleted.delete(ref.cardId);
+          changed = true;
+        }
+        return true;
+      });
+      if (newRefs.length !== s.cardRefs.length || newCompleted.size !== completed.size) {
+        return { ...s, cardRefs: newRefs, completedCardIds: [...newCompleted] };
+      }
+      return s;
+    });
+    if (changed) saveSessions(synced);
+  }, [activeSessions, cardColumnMap, saveSessions]);
 
   const setSessions = useCallback(
     (newSessions: FocusSession[]) => {
