@@ -715,7 +715,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
               overflowY: "auto",
               padding: "24px 32px 32px 32px",
             }}>
-              {descPreview || hasMarkdown ? (
+              {descPreview ? (
                 <div style={{
                   fontSize: 15,
                   color: "rgba(255,255,255,0.8)",
