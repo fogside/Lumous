@@ -277,12 +277,13 @@ function SessionCard({
             {ac.card.timeEstimate && (
               <span style={{
                 fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 5,
-                background: "rgba(180,138,192,0.1)", color: isDone ? "rgba(200,170,220,0.3)" : "rgba(200,170,220,0.7)", flexShrink: 0,
+                background: isDone ? "transparent" : "rgba(180,138,192,0.1)",
+                color: isDone ? "rgba(200,170,220,0.2)" : "rgba(200,170,220,0.7)", flexShrink: 0,
               }}>{ac.card.timeEstimate}</span>
             )}
             <span style={{
               fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 4,
-              background: `${ac.boardColor}20`, color: "rgba(255,255,255,0.3)",
+              background: isDone ? "transparent" : `${ac.boardColor}20`, color: isDone ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.3)",
               flexShrink: 0, maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}>{ac.boardTitle}</span>
           </div>
