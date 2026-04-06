@@ -236,6 +236,7 @@ export function useBoard(
   const boardRef = useRef<Board | null>(null);
   const prevBoardIdRef = useRef<string | null>(initialBoard?.id || null);
   const dirtyRef = useRef(false);
+  const savingPromiseRef = useRef<Promise<void> | null>(null); // track in-flight saves
   // Flag to suppress save effect when SET_BOARD was just dispatched from initialBoard
   const suppressSaveRef = useRef(false);
 
@@ -248,10 +249,17 @@ export function useBoard(
     const prevId = prevBoardIdRef.current;
 
     if (newId !== prevId) {
-      // Flush save the previous board before switching
+      // Flush save the previous board before switching — tracked so flushSave can await it
       clearTimeout(saveTimeout.current);
       if (dirtyRef.current && boardRef.current) {
-        saveBoard(boardRef.current).catch(console.error);
+        const b = boardRef.current;
+        savingPromiseRef.current = (async () => {
+          try {
+            await saveBoard(b);
+            if (b.id) lastMtimeRef.current = await getBoardMtime(b.id);
+          } catch (e) { console.error(e); }
+          savingPromiseRef.current = null;
+        })();
       }
       dirtyRef.current = false;
       prevBoardIdRef.current = newId;
@@ -284,19 +292,21 @@ export function useBoard(
     onBoardChanged?.(board);
 
     clearTimeout(saveTimeout.current);
-    saveTimeout.current = setTimeout(async () => {
-      try {
-        await saveBoard(board);
-        // Update mtime AFTER save completes so polling doesn't reload what we just wrote
-        if (board.id) {
-          try {
-            lastMtimeRef.current = await getBoardMtime(board.id);
-          } catch { /* ignore */ }
+    saveTimeout.current = setTimeout(() => {
+      savingPromiseRef.current = (async () => {
+        try {
+          await saveBoard(board);
+          if (board.id) {
+            try {
+              lastMtimeRef.current = await getBoardMtime(board.id);
+            } catch { /* ignore */ }
+          }
+        } catch (e) {
+          console.error(e);
         }
-      } catch (e) {
-        console.error(e);
-      }
-      dirtyRef.current = false;
+        dirtyRef.current = false;
+        savingPromiseRef.current = null;
+      })();
     }, 500);
     return () => clearTimeout(saveTimeout.current);
   }, [board, onBoardChanged]);
@@ -398,8 +408,13 @@ export function useBoard(
     dispatch({ type: "SET_TIME_ESTIMATES", estimates });
   }, []);
 
-  // Flush any pending debounced save immediately (call before sync)
+  // Flush any pending debounced save immediately (call before sync or disk reads)
+  // Also awaits any in-flight save from board switching
   const flushSave = useCallback(async () => {
+    // Wait for any in-flight board-switch save to complete first
+    if (savingPromiseRef.current) {
+      await savingPromiseRef.current;
+    }
     clearTimeout(saveTimeout.current);
     if (dirtyRef.current && boardRef.current) {
       try {
@@ -433,7 +448,8 @@ export function useBoard(
     const boardId = initialBoard?.id;
     if (!boardId) return;
     try {
-      // Flush pending saves so they're on disk before we reload
+      // Wait for any in-flight save then flush pending
+      if (savingPromiseRef.current) await savingPromiseRef.current;
       if (dirtyRef.current && boardRef.current) {
         clearTimeout(saveTimeout.current);
         await saveBoard(boardRef.current);
