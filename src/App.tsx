@@ -69,9 +69,13 @@ export default function App() {
     );
   }
 
-  // Merge: metadata (title, color) from boards record, card/column state from useBoard reducer
-  const allBoards = board && activeBoardId && boards[activeBoardId]
-    ? { ...boards, [activeBoardId]: { ...board, title: boards[activeBoardId].title, backgroundColor: boards[activeBoardId].backgroundColor } }
+  // Merge: card/column state from useBoard reducer into boards record.
+  // ALWAYS merge the reducer's board (even when switching away) because
+  // refreshBoard runs in a useEffect (after paint) and may not have
+  // committed to boards yet when the user switches boards quickly.
+  const reducerBoardId = board?.id;
+  const allBoards = reducerBoardId && boards[reducerBoardId]
+    ? { ...boards, [reducerBoardId]: { ...board, title: boards[reducerBoardId].title, backgroundColor: boards[reducerBoardId].backgroundColor } }
     : boards;
 
   const editingBoard = editingBoardId ? allBoards[editingBoardId] : null;
