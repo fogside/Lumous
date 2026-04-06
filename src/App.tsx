@@ -69,12 +69,13 @@ export default function App() {
     );
   }
 
-  // Merge: card/column state from useBoard reducer into boards record.
-  // ALWAYS merge the reducer's board (even when switching away) because
-  // refreshBoard runs in a useEffect (after paint) and may not have
-  // committed to boards yet when the user switches boards quickly.
+  // Merge reducer's live board state into boards record, but ONLY when
+  // the reducer's board is the currently active board. When on Today Board
+  // or another board, the boards record (updated by refreshBoard) is the
+  // source of truth — the reducer may hold stale data from the previous board.
   const reducerBoardId = board?.id;
-  const allBoards = reducerBoardId && boards[reducerBoardId]
+  const reducerIsActive = reducerBoardId === activeBoardId && activeBoardId !== TODAY_BOARD_ID;
+  const allBoards = reducerIsActive && reducerBoardId && boards[reducerBoardId]
     ? { ...boards, [reducerBoardId]: { ...board, title: boards[reducerBoardId].title, backgroundColor: boards[reducerBoardId].backgroundColor } }
     : boards;
 
