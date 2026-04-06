@@ -727,11 +727,20 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
               ) : (
                 <textarea
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  autoFocus
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                    e.target.style.height = "auto";
+                    e.target.style.height = e.target.scrollHeight + "px";
+                  }}
+                  ref={(el) => {
+                    if (el) {
+                      el.style.height = "auto";
+                      el.style.height = Math.max(el.scrollHeight, window.innerHeight * 0.7) + "px";
+                      el.focus();
+                    }
+                  }}
                   style={{
                     width: "100%",
-                    minHeight: "calc(86vh - 160px)",
                     background: "transparent",
                     border: "none",
                     fontSize: 15,
@@ -740,6 +749,7 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
                     resize: "none",
                     lineHeight: 1.7,
                     fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
+                    overflow: "hidden",
                   }}
                 />
               )}
