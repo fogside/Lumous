@@ -58,11 +58,14 @@ When GitHub sync is enabled, the following data is committed to your private rep
 | Goals & goal assignments | |
 | Recurring schedules (rituals) | |
 | Time estimates | |
-| Completion timestamps | |
+| Completion timestamps & logs | |
+| Ritual completion logs | |
 | Board titles & colors | |
 | Wizard memories & preferences | |
+| Today Board focus sessions | |
+| Session completion state | |
 
-Wizard proposals and highlights are stripped from board files before every git commit. Once you accept a proposed card, it becomes a normal card and syncs normally. Wizard memories (saved via "remember that...") are stored in `meta.json` and always synced.
+Wizard proposals and highlights are stripped from board files before every git commit. Once you accept a proposed card, it becomes a normal card and syncs normally. Wizard memories and Today Board sessions are stored in `meta.json` and always synced.
 
 ### Stack
 
