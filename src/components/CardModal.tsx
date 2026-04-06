@@ -712,42 +712,37 @@ export function CardModal({ card, columnId, goals, onSave, onDelete, onClose, on
             {/* Content — scrollable, rendered markdown or editable */}
             <div style={{
               flex: 1,
-              overflow: descPreview ? "auto" : "hidden",
+              overflowY: "auto",
               padding: "24px 32px 32px 32px",
-              display: "flex",
-              flexDirection: "column",
-              minHeight: 0,
             }}>
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-                {descPreview ? (
-                  <div style={{
+              {descPreview ? (
+                <div style={{
+                  fontSize: 15,
+                  color: "rgba(255,255,255,0.8)",
+                  lineHeight: 1.7,
+                  userSelect: "text",
+                }}>
+                  {renderMarkdown(description)}
+                </div>
+              ) : (
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  autoFocus
+                  style={{
+                    width: "100%",
+                    minHeight: "calc(86vh - 160px)",
+                    background: "transparent",
+                    border: "none",
                     fontSize: 15,
                     color: "rgba(255,255,255,0.8)",
+                    outline: "none",
+                    resize: "none",
                     lineHeight: 1.7,
-                    userSelect: "text",
-                  }}>
-                    {renderMarkdown(description)}
-                  </div>
-                ) : (
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    autoFocus
-                    style={{
-                      width: "100%",
-                      flex: 1,
-                      background: "transparent",
-                      border: "none",
-                      fontSize: 15,
-                      color: "rgba(255,255,255,0.8)",
-                      outline: "none",
-                      resize: "none",
-                      lineHeight: 1.7,
-                      fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
-                    }}
-                  />
-                )}
-              </div>
+                    fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
+                  }}
+                />
+              )}
             </div>
 
             {/* Footer with edit toggle */}
