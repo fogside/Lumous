@@ -1,5 +1,20 @@
 # Releases
 
+## v2.0.2 — Cross-Board Sync Fix
+
+*2026-04-06*
+
+- **Two-way board sync** — moving cards on source boards now immediately reflects on the Today Board (and vice versa) without delays or reverts
+- **New cards in Today column** appear on Today Board instantly when switching
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v2.0.1 — Cross-Board Sync & Polish
 
 *2026-04-06*
