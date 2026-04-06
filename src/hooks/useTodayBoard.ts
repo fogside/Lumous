@@ -134,28 +134,29 @@ export function useTodayBoard(
   // - Remove cards moved to "todo" (no longer a today task)
   // - Auto-mark cards completed on source board
   // - Auto-unmark cards moved back to today/in-progress from completed
+  // Only depends on cardColumnMap (boards changes) — reads fresh sessions to avoid loops
   useEffect(() => {
-    if (activeSessions.length === 0) return;
+    const currentSessions = meta?.settings.todaySessions || [];
+    const currentDate = meta?.settings.todayDate || "";
+    if (currentDate !== today || currentSessions.length === 0) return;
+
     let changed = false;
-    const synced = activeSessions.map((s) => {
+    const synced = currentSessions.map((s) => {
       const completed = new Set(s.completedCardIds || []);
       const newCompleted = new Set(completed);
       const newRefs = s.cardRefs.filter((ref) => {
         const col = cardColumnMap.get(ref.cardId);
         if (!col) return true; // card not found — keep (might be loading)
         if (col === "todo") {
-          // Card moved to Todo on source board — remove from session
           changed = true;
           newCompleted.delete(ref.cardId);
           return false;
         }
         if (col === "completed" && !completed.has(ref.cardId)) {
-          // Card completed on source board — auto-mark in session
           newCompleted.add(ref.cardId);
           changed = true;
         }
         if ((col === "today" || col === "in-progress") && completed.has(ref.cardId)) {
-          // Card moved back from completed on source board — unmark
           newCompleted.delete(ref.cardId);
           changed = true;
         }
@@ -166,8 +167,8 @@ export function useTodayBoard(
       }
       return s;
     });
-    if (changed) saveSessions(synced);
-  }, [activeSessions, cardColumnMap, saveSessions]);
+    if (changed) updateSettings({ todaySessions: synced, todayDate: today });
+  }, [cardColumnMap, meta, today, updateSettings]);
 
   const setSessions = useCallback(
     (newSessions: FocusSession[]) => {
