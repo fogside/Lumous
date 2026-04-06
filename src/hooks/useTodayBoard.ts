@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useEffect } from "react";
+import { useMemo, useCallback, useEffect, useRef } from "react";
 import { Board, Card, CardRef, FocusSession, Meta } from "../lib/types";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -134,19 +134,25 @@ export function useTodayBoard(
   // - Remove cards moved to "todo" (no longer a today task)
   // - Auto-mark cards completed on source board
   // - Auto-unmark cards moved back to today/in-progress from completed
-  // Only depends on cardColumnMap (boards changes) — reads fresh sessions to avoid loops
+  // Runs whenever boards change (cardColumnMap) or sessions change
+  const lastSyncHashRef = useRef("");
   useEffect(() => {
-    const currentSessions = meta?.settings.todaySessions || [];
-    const currentDate = meta?.settings.todayDate || "";
-    if (currentDate !== today || currentSessions.length === 0) return;
+    if (activeSessions.length === 0) return;
+
+    // Build a hash of current state to prevent infinite loops
+    const stateHash = activeSessions.map((s) =>
+      `${s.id}:${s.cardRefs.map((r) => r.cardId).join(",")}:${(s.completedCardIds || []).join(",")}`
+    ).join("|") + "||" + [...cardColumnMap.entries()].map(([k, v]) => `${k}=${v}`).join(",");
+
+    if (stateHash === lastSyncHashRef.current) return;
 
     let changed = false;
-    const synced = currentSessions.map((s) => {
+    const synced = activeSessions.map((s) => {
       const completed = new Set(s.completedCardIds || []);
       const newCompleted = new Set(completed);
       const newRefs = s.cardRefs.filter((ref) => {
         const col = cardColumnMap.get(ref.cardId);
-        if (!col) return true; // card not found — keep (might be loading)
+        if (!col) return true;
         if (col === "todo") {
           changed = true;
           newCompleted.delete(ref.cardId);
@@ -167,8 +173,18 @@ export function useTodayBoard(
       }
       return s;
     });
-    if (changed) updateSettings({ todaySessions: synced, todayDate: today });
-  }, [cardColumnMap, meta, today, updateSettings]);
+
+    if (changed) {
+      // Update hash BEFORE saving to prevent re-entry
+      const newHash = synced.map((s) =>
+        `${s.id}:${s.cardRefs.map((r) => r.cardId).join(",")}:${(s.completedCardIds || []).join(",")}`
+      ).join("|") + "||" + [...cardColumnMap.entries()].map(([k, v]) => `${k}=${v}`).join(",");
+      lastSyncHashRef.current = newHash;
+      saveSessions(synced);
+    } else {
+      lastSyncHashRef.current = stateHash;
+    }
+  }, [activeSessions, cardColumnMap, saveSessions]);
 
   const setSessions = useCallback(
     (newSessions: FocusSession[]) => {
