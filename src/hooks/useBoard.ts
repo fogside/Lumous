@@ -266,12 +266,14 @@ export function useBoard(
     }
 
     if (initialBoard) {
-      // Only dispatch SET_BOARD when switching to a DIFFERENT board.
-      // If switching back to the same board the reducer already holds,
-      // the reducer has fresher data (e.g., card moved to completed)
-      // than initialBoard (which comes from the potentially stale boards record).
-      const reducerHasSameBoard = boardRef.current?.id === initialBoard.id;
-      if (!reducerHasSameBoard) {
+      // When switching back to the same board, only update if initialBoard
+      // is a genuinely new version (different reference from what we last set).
+      // This prevents stale boards record from overwriting fresh reducer state
+      // when switching Board A → Today Board → Board A, while still allowing
+      // external updates (refreshBoard, MCP, sync) to flow through.
+      const isSameBoard = boardRef.current?.id === initialBoard.id;
+      const isStaleReturn = isSameBoard && initialBoard === lastSetBoardRef.current;
+      if (!isStaleReturn) {
         suppressSaveRef.current = true;
         lastSetBoardRef.current = initialBoard;
         dispatch({ type: "SET_BOARD", board: initialBoard });
