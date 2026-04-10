@@ -132,6 +132,75 @@ All components use **inline styles**, not Tailwind utility classes. This was a d
 - **Image assets**: `public/wizard-gold.png` (celebration), `public/wizard-watermark.png` (sidebar), `src-tauri/icons/` (app icon from `mage.png`/`mage_small.png`)
 - **Icons**: generated via Pillow script from `mage.png` (>89px) and `mage_small.png` (≤89px), 18% corner radius
 
+## Wizard Action System
+
+The wizard (`WizardPanel.tsx`) sends structured JSON responses that `applyActions` executes atomically:
+
+### WizardResponse actions
+| Action | Effect |
+|--------|--------|
+| `newCards` | Creates proposed cards (`proposed: true`) — user accepts/rejects individually |
+| `highlights` | Marks cards with `highlighted: true` + `highlightReason` — visual cue only |
+| `dayPlan` | Reorders one column (`columnId` + `order[]`). Only reorders cards already in that column — never cross-pollinate |
+| `labels` | Sets `card.label` (color label) |
+| `rituals` | Sets `card.ritual.schedule` for recurring tasks |
+| `moveCards` | Moves cards between columns (directly, no confirmation needed) |
+| `removeCards` | Marks cards with `proposedDelete: true` — user must approve via "Delete / Keep" buttons |
+| `sessions` | Creates focus sessions in meta.json |
+| `remember` | Saves wizard memories to meta.settings.wizardMemories |
+
+### Proposal lifecycle
+- **Proposed new cards** (`proposed: true`): dashed purple border, ✓ / ✗ buttons. Accept = keep card (clear flag). Reject = delete card.
+- **Proposed deletions** (`proposedDelete: true`): dashed red border, strikethrough title, "Delete / Keep" buttons. Accept = actually delete. Reject = clear flag (keep card).
+- **MOVE_CARD reducer**: always clears ALL wizard transient flags (`proposed`, `highlighted`, `proposedDelete`, etc.) — manual drag is implicit acceptance.
+- **`strip_wizard_transient` (Rust)**: strips `proposed` cards entirely + clears `highlighted`, `proposedDelete`, `proposedDeleteReason` before git sync.
+- **applyActions is atomic**: one `save_board` + one `reloadFromDisk()` per wizard message. Never dispatch partial updates.
+
+### Critical: dayPlan safety
+`dayPlan.order` must only reference cards already in the target column. `applyActions` enforces this:
+```js
+const colIdSet = new Set(col.cardIds);
+const validIds = [...new Set(mappedOrder.filter(id => boardData.cards[id] && colIdSet.has(id)))];
+```
+Cards from other columns accidentally included in `order[]` are silently ignored. Without this guard, cards would appear in two columns simultaneously, breaking @dnd-kit layout.
+
+## Cross-Board Sync & allBoards Pattern
+
+The app maintains two parallel sources of truth:
+1. **`useBoard` reducer** (`board`) — live, in-memory state for the active board. Always the freshest data.
+2. **`useBoards` state** (`boards`) — record of all boards loaded from disk. Used by Sidebar, Today Board, etc.
+
+**The merge** (in `App.tsx`):
+```js
+const allBoards = useMemo(() => {
+  return reducerBoardId && boards[reducerBoardId]
+    ? { ...boards, [reducerBoardId]: { ...board, title: boards[reducerBoardId].title, backgroundColor: boards[reducerBoardId].backgroundColor } }
+    : boards;
+}, [boards, board, reducerBoardId]);
+```
+Always use `allBoards` when you need any board's current state. `boards` alone may be stale for the active board.
+
+**`isStaleReturn` guard** in `useBoard.ts`: prevents the `initialBoard` effect from overwriting the reducer with a stale board when switching Board A → Today Board → Board A. Only fires `SET_BOARD` when `initialBoard !== lastSetBoardRef.current`.
+
+**`setBoardIfMatch`**: Today Board operations (completeCard, uncompleteCard, startSession) call this after writing to disk. It updates the useBoard reducer directly if the board ID matches, avoiding a full `reloadFromDisk`.
+
+**`refreshBoard`**: called via `onBoardChanged` in the auto-save effect (wrapped in `startTransition`). Updates `boards` record so sidebar stays current. Non-urgent — never blocks user input.
+
+## Performance Patterns
+
+- **`startTransition`** wraps all background board updates: file poll `SET_BOARD`, `onBoardChanged` in auto-save. Tells React these updates are lower priority than user input (typing, dragging).
+- **`useMemo` for `allBoards`** in `App.tsx`: only recomputes when `board` or `boards` change, not on every App render (e.g., toggling wizard, collapsing sidebar).
+- **No `React.memo` currently** on Card/Column — if render performance becomes an issue, add `React.memo` + `useCallback` for all card/column callbacks in BoardView.
+
+## @dnd-kit Pitfalls
+
+- **Duplicate card IDs in `col.cardIds`** cause React duplicate-key warnings AND @dnd-kit layout corruption (cards overlap, huge gaps, broken scroll). Guard against this:
+  - `dayPlan` reorder: only include IDs that exist in the column (`colIdSet.has(id)`)
+  - `moveCards`: filter before unshift (`toCol.cardIds = toCol.cardIds.filter(id => id !== realId)`)
+  - BoardView render: `[...new Set(column.cardIds)]` as safety net
+- **Changing `items` during drag**: @dnd-kit handles this if you follow the `onDragOver` → immediate `MOVE_CARD` → `onDragEnd` final-position pattern (already implemented)
+- **Card height changes during session**: if proposed cards (with extra buttons/text) are accepted mid-session, @dnd-kit may have stale measurements. Generally resolves on next drag.
+
 ## Common Issues
 - **Port 1420 in use**: `lsof -ti :1420 | xargs kill -9`
 - **Cargo not found**: `export PATH="$HOME/.cargo/bin:$PATH"`

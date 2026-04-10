@@ -54,6 +54,8 @@ export interface Card {
   proposedReasoning?: string;
   highlighted?: boolean;
   highlightReason?: string;
+  proposedDelete?: boolean;
+  proposedDeleteReason?: string;
 }
 
 export interface Column {
@@ -89,6 +91,19 @@ export interface FocusSession {
 }
 
 export const TODAY_BOARD_ID = "today-board";
+
+export interface WizardHistoryMessage {
+  role: "user" | "wizard";
+  text: string;
+  actionSummary?: string; // e.g. "3 cards, day plan"
+}
+
+export interface WizardConversation {
+  id: string;
+  boardId: string;
+  startedAt: string; // ISO
+  messages: WizardHistoryMessage[];
+}
 
 export interface Settings {
   syncRepoUrl: string;

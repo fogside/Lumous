@@ -1,5 +1,23 @@
 # Releases
 
+## v2.0.3 — Wizard History & Bug Fixes
+
+*2026-04-10*
+
+- **Wizard conversation history** — past conversations are saved per board in separate files and restored when you reopen the wizard. Browse history with the new "history" button, start a new conversation with "+ new"
+- **Persistent wizard sessions** — switching between boards no longer clears the wizard chat; each board keeps its own live conversation
+- **Wizard context fix** — removed/proposed-for-deletion cards are now hidden from the wizard's board view
+- **Header buttons more visible** — "history", "back", "+ new", and "memories" buttons now have pill styling and are easier to tap
+- **Bug fixes** — stale closure fix in Today Board card operations; wizard transcript capped at 20 messages to prevent context blowup; side-effect cleanup in state updaters
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v2.0.2 — Cross-Board Sync Fix
 
 *2026-04-06*

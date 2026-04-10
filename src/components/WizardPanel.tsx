@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
-import { Board, Card, CARD_LABELS, CardRef, DARK_INK, FocusSession, Meta } from "../lib/types";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Board, Card, CARD_LABELS, CardRef, DARK_INK, FocusSession, Meta, WizardConversation, WizardHistoryMessage } from "../lib/types";
 import { invoke } from "@tauri-apps/api/core";
-import { loadMeta, saveMeta } from "../lib/storage";
+import { loadMeta, loadWizardHistory, saveWizardHistory } from "../lib/storage";
 import { renderMarkdown } from "../lib/markdown";
 
 const PANEL_WIDTH = 360;
@@ -22,6 +22,7 @@ interface WizardResponse {
   sessions?: { duration: number; timeOfDay: string; cardIds: string[] }[];
   rituals?: { cardId: string; schedule: "daily" | number[] | null }[];
   moveCards?: { cardId: string; toColumn: string }[];
+  removeCards?: { cardId: string; reason?: string }[];
   remember?: string[];
 }
 
@@ -59,7 +60,7 @@ function serializeTodayBoard(allBoards: Record<string, Board>, meta: Meta | null
       if (col.id !== "today" && col.id !== "in-progress") continue;
       for (const cardId of col.cardIds) {
         const card = b.cards[cardId];
-        if (!card || card.proposed) continue;
+        if (!card || card.proposed || card.proposedDelete) continue;
         let line = `- [${cardId}] "${card.title}" (${card.timeEstimate || "no estimate"}) from board "${b.title}"`;
         if (card.label) line += ` [label: ${card.label}]`;
         lines.push(line);
@@ -96,7 +97,7 @@ function serializeBoard(board: Board): string {
     } else {
       for (const cardId of col.cardIds) {
         const card = board.cards[cardId];
-        if (!card || card.proposed) continue;
+        if (!card || card.proposed || card.proposedDelete) continue;
         let line = `- [${cardId}] ${card.title}`;
         if (card.description) line += ` — ${card.description}`;
         if (card.timeEstimate) line += ` (${card.timeEstimate})`;
@@ -135,6 +136,7 @@ Response schema:
   "labels": [{"cardId": "existing-card-id", "label": "ember|honey|sage|slate|plum|rose|copper|ultramarine"}],
   "rituals": [{"cardId": "existing-card-id", "schedule": "daily or [0,1,2,3,4,5] (0=Sun..6=Sat) or null to remove"}],
   "moveCards": [{"cardId": "existing-card-id", "toColumn": "todo|today|in-progress|completed"}],
+  "removeCards": [{"cardId": "existing-card-id", "reason": "why this should be deleted"}],
   "remember": ["preference or rule to save for future sessions"]
 }
 
@@ -150,6 +152,7 @@ Rules:
 - Include "research" when the user asks to research a specific card or topic that matches an existing card. This triggers a deep background research job on that card — the results will appear in the card's description. Use the card's ID and provide a clear research context
 - Include "labels" to assign color labels to cards. Available labels: ember (red-orange), honey (yellow), sage (green), slate (blue), plum (purple), rose (pink), copper (warm brown), ultramarine (deep purple). Use null to remove a label. Apply labels when the user asks to categorize, color-code, or tag cards
 - Include "moveCards" to move cards between columns. Use when the user says they completed a task, started working on something, or wants to reprioritize. Columns: "todo", "today", "in-progress", "completed". Moving to "completed" marks the task as done
+- Include "removeCards" to suggest deleting cards. Use when the user wants to clean up, remove stale/irrelevant tasks, or explicitly asks to delete something. The user sees a deletion proposal they can approve or reject — cards are NOT deleted until approved. Format: [{"cardId": "existing-card-id", "reason": "why this should be removed"}]
 - Include "rituals" to make cards recurring. Use "daily" for every day, a number array for specific days (0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat), e.g. [1,2,3,4,5] for weekdays. Use null to remove a recurring schedule. When completed, ritual cards automatically respawn in the Today column on their next scheduled day
 - Include "remember" when the user says "remember that...", "I always...", "my X usually takes...", or expresses a recurring preference
 - Keep card titles concise (3-8 words)
@@ -157,10 +160,46 @@ Rules:
 - Be encouraging, not overwhelming. If the user seems stressed, suggest a focused subset${memoryBlock}`;
 }
 
+// ─── History helpers ────────────────────────────────────────────
+
+function buildActionSummaryStr(r: WizardResponse): string | undefined {
+  const parts: string[] = [];
+  if (r.newCards?.length) parts.push(`${r.newCards.length} card${r.newCards.length > 1 ? "s" : ""}`);
+  if (r.dayPlan) parts.push("day plan");
+  if (r.sessions?.length) parts.push(`${r.sessions.length} session${r.sessions.length > 1 ? "s" : ""}`);
+  if (r.moveCards?.length) parts.push(`${r.moveCards.length} moved`);
+  if (r.removeCards?.length) parts.push(`${r.removeCards.length} removal${r.removeCards.length > 1 ? "s" : ""}`);
+  if (r.highlights?.length) parts.push(`${r.highlights.length} highlighted`);
+  if (r.labels?.length) parts.push(`${r.labels.length} labeled`);
+  if (r.rituals?.length) parts.push(`${r.rituals.length} ritual${r.rituals.length > 1 ? "s" : ""}`);
+  return parts.length > 0 ? parts.join(", ") : undefined;
+}
+
+function messagesFromHistory(conv: WizardConversation): ChatMessage[] {
+  return conv.messages.map((m) => {
+    if (m.role === "user") return { role: "user" as const, text: m.text };
+    return { role: "wizard" as const, response: { text: m.text }, applied: true };
+  });
+}
+
+function formatHistoryDate(iso: string): string {
+  const date = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatHistoryTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
 // ─── Component ──────────────────────────────────────────────────
 
 export function WizardPanel({ board, boards, isTodayBoard, meta, onClose, updateCard, reorderColumn, setTimeEstimates, reloadFromDisk, updateSettings, startResearch, moveCard, flushSave }: Props) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messagesByBoard, setMessagesByBoard] = useState<Record<string, ChatMessage[]>>({});
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
@@ -168,20 +207,107 @@ export function WizardPanel({ board, boards, isTodayBoard, meta, onClose, update
 
   const memories = meta?.settings.wizardMemories || [];
   const [showMemories, setShowMemories] = useState(false);
-  const boardIdRef = useRef(board?.id || "today-board");
+  const currentBoardId = board?.id || "today-board";
+  const boardIdRef = useRef(currentBoardId);
+
+  // History state
+  const [historyByBoard, setHistoryByBoard] = useState<Record<string, WizardConversation[]>>({});
+  const [currentConvByBoard, setCurrentConvByBoard] = useState<Record<string, { id: string; startedAt: string }>>({});
+  // historyView: null = current chat, "list" = list of past convos, string = viewing a specific convo id
+  const [historyView, setHistoryView] = useState<null | "list" | string>(null);
+  const historyLoadedRef = useRef<Set<string>>(new Set());
+
+  // Derive current messages from per-board map
+  const messages = messagesByBoard[currentBoardId] || [];
+  const setMessages = (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
+    setMessagesByBoard((prev) => {
+      const current = prev[currentBoardId] || [];
+      const next = typeof updater === "function" ? updater(current) : updater;
+      return { ...prev, [currentBoardId]: next };
+    });
+  };
+
+  // What's shown in the chat area — current session or a historical conversation
+  const viewingConversation = historyView && historyView !== "list"
+    ? (historyByBoard[currentBoardId] || []).find((c) => c.id === historyView) ?? null
+    : null;
+  const displayMessages: ChatMessage[] = viewingConversation
+    ? messagesFromHistory(viewingConversation)
+    : messages;
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  // Clear chat when board changes (prevent applying actions to wrong board)
+  // On board switch: update ref, clear loading state, close history view
   useEffect(() => {
-    const currentId = board?.id || "today-board";
-    if (currentId !== boardIdRef.current) {
-      boardIdRef.current = currentId;
-      setMessages([]);
-      setInput("");
+    if (currentBoardId !== boardIdRef.current) {
+      boardIdRef.current = currentBoardId;
       setLoading(false);
+      setHistoryView(null);
     }
-  }, [board?.id, isTodayBoard]);
+  }, [currentBoardId]);
+
+  // Load history once per board per session; restore last conversation if no messages yet
+  useEffect(() => {
+    const bid = currentBoardId;
+    if (historyLoadedRef.current.has(bid)) return;
+    historyLoadedRef.current.add(bid);
+    loadWizardHistory(bid).then((history) => {
+      setHistoryByBoard((prev) => ({ ...prev, [bid]: history }));
+      if (history.length > 0) {
+        const last = history[history.length - 1];
+        setMessagesByBoard((prev) => {
+          if ((prev[bid] || []).length > 0) return prev; // already has messages
+          return { ...prev, [bid]: messagesFromHistory(last) };
+        });
+        setCurrentConvByBoard((prev) => ({ ...prev, [bid]: { id: last.id, startedAt: last.startedAt } }));
+      }
+    }).catch(() => {
+      setHistoryByBoard((prev) => ({ ...prev, [bid]: [] }));
+    });
+  }, [currentBoardId]);
+
+  // Save current conversation to history file (upsert by conversation id)
+  const saveCurrentConversation = useCallback(async (msgs: ChatMessage[]) => {
+    const bid = currentBoardId;
+    const existingConv = currentConvByBoard[bid];
+    const conv = existingConv || { id: crypto.randomUUID(), startedAt: new Date().toISOString() };
+    if (!existingConv) {
+      setCurrentConvByBoard((prev) => ({ ...prev, [bid]: conv }));
+    }
+
+    const histMsgs: WizardHistoryMessage[] = msgs
+      .filter((m) => m.role !== "system")
+      .map((m) => {
+        if (m.role === "user") return { role: "user" as const, text: m.text };
+        const wm = m as { role: "wizard"; response: WizardResponse };
+        return { role: "wizard" as const, text: wm.response.text, actionSummary: buildActionSummaryStr(wm.response) };
+      });
+
+    const conversation: WizardConversation = { id: conv.id, boardId: bid, startedAt: conv.startedAt, messages: histMsgs };
+
+    // Compute new history array outside state updater (updaters run twice in StrictMode)
+    const history = historyByBoard[bid] || [];
+    const idx = history.findIndex((h) => h.id === conv.id);
+    const updated = idx >= 0 ? history.map((h, i) => i === idx ? conversation : h) : [...history, conversation];
+    const capped = updated.slice(-100);
+
+    setHistoryByBoard((prev) => ({ ...prev, [bid]: capped }));
+    saveWizardHistory(bid, capped).catch(console.error);
+  }, [currentBoardId, currentConvByBoard, historyByBoard]);
+
+  // Start a new conversation (archive current to history, reset session)
+  const startNewConversation = useCallback(() => {
+    setMessagesByBoard((prev) => ({ ...prev, [currentBoardId]: [] }));
+    setCurrentConvByBoard((prev) => {
+      const next = { ...prev };
+      delete next[currentBoardId];
+      return next;
+    });
+    setHistoryView(null);
+    setInput("");
+    setLoading(false);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, [currentBoardId]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -210,16 +336,21 @@ export function WizardPanel({ board, boards, isTodayBoard, meta, onClose, update
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
     const userText = input.trim();
+    const prevMessages = messages; // capture before state updates
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "20px";
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
     setLoading(true);
+    if (historyView) setHistoryView(null); // return to current chat
 
     try {
       const boardState = isTodayBoard && boards
         ? serializeTodayBoard(boards, meta)
         : board ? serializeBoard(board) : "No board loaded";
-      const transcript = buildTranscript([...messages, { role: "user", text: userText }]);
+      // Cap transcript to last 20 messages to avoid blowing context window on long conversations
+      const allMsgs = [...prevMessages, { role: "user" as const, text: userText }];
+      const transcriptMsgs = allMsgs.slice(-20);
+      const transcript = buildTranscript(transcriptMsgs);
 
       const todayBoardExtra = isTodayBoard ? `
 
@@ -252,12 +383,22 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
       // Save memories if any
       if (response.remember?.length) {
         await saveMemories(response.remember);
-        setMessages((prev) => [...prev,
+        const newMsgs: ChatMessage[] = [
+          ...prevMessages,
+          { role: "user", text: userText },
           { role: "wizard", response },
           { role: "system", text: `Remembered: ${response.remember!.join("; ")}` },
-        ]);
+        ];
+        setMessages(newMsgs);
+        saveCurrentConversation(newMsgs);
       } else {
-        setMessages((prev) => [...prev, { role: "wizard", response }]);
+        const newMsgs: ChatMessage[] = [
+          ...prevMessages,
+          { role: "user", text: userText },
+          { role: "wizard", response },
+        ];
+        setMessages(newMsgs);
+        saveCurrentConversation(newMsgs);
       }
     } catch (e) {
       setMessages((prev) => [...prev, { role: "system", text: `Error: ${e}` }]);
@@ -269,7 +410,7 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
   const hasActions = (msg: ChatMessage): msg is { role: "wizard"; response: WizardResponse; applied?: boolean } => {
     if (msg.role !== "wizard") return false;
     const r = msg.response;
-    return !!(r.newCards?.length || r.dayPlan || r.highlights?.length || r.research?.length || r.labels?.length || r.rituals?.length || r.moveCards?.length || r.sessions?.length);
+    return !!(r.newCards?.length || r.dayPlan || r.highlights?.length || r.research?.length || r.labels?.length || r.rituals?.length || r.moveCards?.length || r.removeCards?.length || r.sessions?.length);
   };
 
   const applyingRef = useRef(false);
@@ -284,10 +425,13 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
       // Flush pending saves so disk has the latest user changes before we modify
       await flushSave();
 
+      // Capture board ID now — board prop may change if user switches boards mid-apply
+      const applyBoardId = board?.id;
+
       // Apply ALL actions atomically via one disk write + one reload
       // This prevents polling from wiping in-flight reducer changes
-      if (board) {
-      const boardData = JSON.parse(await invoke<string>("load_board", { id: board.id }));
+      if (board && applyBoardId) {
+      const boardData = JSON.parse(await invoke<string>("load_board", { id: applyBoardId }));
       const idMap: Record<string, string> = {};
 
       // Step 1: Create new cards
@@ -328,7 +472,10 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
         const col = boardData.columns.find((c: { id: string }) => c.id === r.dayPlan!.columnId);
         if (col) {
           const mappedOrder = r.dayPlan.order.map((id: string) => idMap[id] || id);
-          const validIds = mappedOrder.filter((id: string) => boardData.cards[id]);
+          // Only include cards that are actually IN this column — prevents cross-column duplicates
+          // if the AI includes a card from a different column in order[]
+          const colIdSet = new Set(col.cardIds);
+          const validIds = [...new Set(mappedOrder.filter((id: string) => boardData.cards[id] && colIdSet.has(id)))];
           const remaining = col.cardIds.filter((id: string) => !validIds.includes(id));
           col.cardIds = [...validIds, ...remaining];
         }
@@ -371,6 +518,8 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
           const toCol = boardData.columns.find((c: { id: string }) => c.id === mv.toColumn);
           if (fromCol && toCol && fromCol.id !== toCol.id) {
             fromCol.cardIds = fromCol.cardIds.filter((id: string) => id !== realId);
+            // Guard against duplicates: remove from destination before adding
+            toCol.cardIds = toCol.cardIds.filter((id: string) => id !== realId);
             toCol.cardIds.unshift(realId);
             // Set completedAt when moving to completed + update completionLog
             if (mv.toColumn === "completed" && boardData.cards[realId]) {
@@ -394,9 +543,20 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
         }
       }
 
-      // One atomic write + one reload
-      await invoke("save_board", { id: board.id, data: JSON.stringify(boardData, null, 2) });
-      reloadFromDisk();
+      // Step 7: Mark cards for deletion (user must approve before actual removal)
+      if (r.removeCards?.length) {
+        for (const rc of r.removeCards) {
+          const realId = idMap[rc.cardId] || rc.cardId;
+          if (boardData.cards[realId]) {
+            boardData.cards[realId].proposedDelete = true;
+            if (rc.reason) boardData.cards[realId].proposedDeleteReason = rc.reason;
+          }
+        }
+      }
+
+      // One atomic write + conditional reload (skip if user switched boards mid-apply)
+      await invoke("save_board", { id: applyBoardId, data: JSON.stringify(boardData, null, 2) });
+      if (board?.id === applyBoardId) reloadFromDisk();
 
       // Trigger background research using the just-written board data
       if (r.research?.length) {
@@ -464,21 +624,58 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
       }}>
         <span style={{ fontSize: 20 }}>{"🧙"}</span>
         <span style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.7)", flex: 1 }}>
-          Wizard
+          {historyView === "list" ? "History" : viewingConversation ? formatHistoryDate(viewingConversation.startedAt) : "Wizard"}
         </span>
+        {/* New chat button — visible when there are messages or viewing history */}
+        {(messages.length > 0 || historyView) && (
+          <button
+            onClick={historyView ? () => { setHistoryView(null); startNewConversation(); } : startNewConversation}
+            title="New conversation"
+            style={{
+              fontSize: 11, fontWeight: 500,
+              color: "rgba(255,255,255,0.45)", cursor: "pointer",
+              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)",
+              padding: "3px 8px", borderRadius: 5, transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+          >
+            + new
+          </button>
+        )}
+        {/* History button */}
+        {(historyByBoard[currentBoardId] || []).length > 0 && (
+          <button
+            onClick={() => setHistoryView(historyView ? null : "list")}
+            title={historyView ? "Back to chat" : "View history"}
+            style={{
+              fontSize: 11, fontWeight: 500,
+              color: historyView ? "rgba(180,138,192,0.85)" : "rgba(255,255,255,0.45)",
+              cursor: "pointer",
+              background: historyView ? "rgba(180,138,192,0.12)" : "rgba(255,255,255,0.06)",
+              border: historyView ? "1px solid rgba(180,138,192,0.2)" : "1px solid rgba(255,255,255,0.08)",
+              padding: "3px 8px", borderRadius: 5, transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = historyView ? "rgba(180,138,192,1)" : "rgba(255,255,255,0.75)"; e.currentTarget.style.background = historyView ? "rgba(180,138,192,0.18)" : "rgba(255,255,255,0.1)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = historyView ? "rgba(180,138,192,0.85)" : "rgba(255,255,255,0.45)"; e.currentTarget.style.background = historyView ? "rgba(180,138,192,0.12)" : "rgba(255,255,255,0.06)"; }}
+          >
+            {historyView ? "← back" : "history"}
+          </button>
+        )}
         {memories.length > 0 && (
           <div style={{ position: "relative" }}>
             <button
               onClick={() => setShowMemories(!showMemories)}
               style={{
-                fontSize: 10, color: showMemories ? "rgba(180,138,192,0.6)" : "rgba(255,255,255,0.18)",
+                fontSize: 11, fontWeight: 500,
+                color: showMemories ? "rgba(180,138,192,0.85)" : "rgba(255,255,255,0.45)",
                 cursor: "pointer",
-                background: "transparent",
-                border: "none",
-                padding: "2px 6px",
-                borderRadius: 4,
-                transition: "all 0.15s",
+                background: showMemories ? "rgba(180,138,192,0.12)" : "rgba(255,255,255,0.06)",
+                border: showMemories ? "1px solid rgba(180,138,192,0.2)" : "1px solid rgba(255,255,255,0.08)",
+                padding: "3px 8px", borderRadius: 5, transition: "all 0.15s",
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = showMemories ? "rgba(180,138,192,1)" : "rgba(255,255,255,0.75)"; e.currentTarget.style.background = showMemories ? "rgba(180,138,192,0.18)" : "rgba(255,255,255,0.1)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = showMemories ? "rgba(180,138,192,0.85)" : "rgba(255,255,255,0.45)"; e.currentTarget.style.background = showMemories ? "rgba(180,138,192,0.12)" : "rgba(255,255,255,0.06)"; }}
             >
               {memories.length} memories
             </button>
@@ -564,7 +761,66 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
         flexDirection: "column",
         gap: 12,
       }}>
-        {messages.length === 0 && !loading && (
+
+        {/* History list view */}
+        {historyView === "list" && (() => {
+          const history = [...(historyByBoard[currentBoardId] || [])].reverse();
+          if (history.length === 0) return (
+            <div style={{ textAlign: "center", padding: "40px 12px", color: "rgba(255,255,255,0.15)", fontSize: 13 }}>
+              No past conversations yet.
+            </div>
+          );
+          return history.map((conv) => {
+            const firstUser = conv.messages.find((m) => m.role === "user");
+            const exchangeCount = conv.messages.filter((m) => m.role === "wizard").length;
+            const isCurrent = currentConvByBoard[currentBoardId]?.id === conv.id;
+            return (
+              <button
+                key={conv.id}
+                onClick={() => setHistoryView(conv.id)}
+                style={{
+                  textAlign: "left", background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10,
+                  padding: "10px 12px", cursor: "pointer", transition: "all 0.15s",
+                  display: "flex", flexDirection: "column", gap: 4,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.35)" }}>
+                    {formatHistoryDate(conv.startedAt)}
+                  </span>
+                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.18)" }}>
+                    {formatHistoryTime(conv.startedAt)}
+                  </span>
+                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.15)", marginLeft: "auto" }}>
+                    {exchangeCount} exchange{exchangeCount !== 1 ? "s" : ""}
+                  </span>
+                  {isCurrent && <span style={{ fontSize: 9, color: "rgba(180,138,192,0.5)", fontWeight: 600 }}>current</span>}
+                </div>
+                {firstUser && (
+                  <div style={{
+                    fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.4,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {firstUser.text}
+                  </div>
+                )}
+              </button>
+            );
+          });
+        })()}
+
+        {/* Read-only historical conversation header */}
+        {viewingConversation && (
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", paddingBottom: 4, fontStyle: "italic" }}>
+            {formatHistoryDate(viewingConversation.startedAt)} · {formatHistoryTime(viewingConversation.startedAt)}
+          </div>
+        )}
+
+        {/* Empty state (only shown in current chat mode) */}
+        {!historyView && messages.length === 0 && !loading && (
           <div style={{
             textAlign: "center",
             padding: "40px 12px",
@@ -583,7 +839,7 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
           </div>
         )}
 
-        {messages.map((msg, i) => {
+        {historyView !== "list" && displayMessages.map((msg, i) => {
           if (msg.role === "user") {
             return (
               <div key={i} style={{
@@ -642,6 +898,7 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
           if (r.labels?.length) actionSummary.push(`${r.labels.length} label${r.labels.length > 1 ? "s" : ""}`);
           if (r.rituals?.length) actionSummary.push(`${r.rituals.length} ritual${r.rituals.length > 1 ? "s" : ""}`);
           if (r.moveCards?.length) actionSummary.push(`${r.moveCards.length} move${r.moveCards.length > 1 ? "s" : ""}`);
+          if (r.removeCards?.length) actionSummary.push(`${r.removeCards.length} removal${r.removeCards.length > 1 ? "s" : ""}`);
           if (r.sessions?.length) actionSummary.push(`${r.sessions.length} session${r.sessions.length > 1 ? "s" : ""}`);
 
           return (
@@ -808,6 +1065,29 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
                 </div>
               )}
 
+              {/* Card removals */}
+              {r.removeCards && r.removeCards.length > 0 && (
+                <div style={{ padding: "0 4px" }}>
+                  {r.removeCards.map((rc, j) => {
+                    const cardTitle = resolveTitle(rc.cardId);
+                    return (
+                      <div key={j} style={{
+                        fontSize: 12,
+                        color: "rgba(232,131,106,0.7)",
+                        padding: "3px 0",
+                        display: "flex",
+                        alignItems: "baseline",
+                        gap: 6,
+                      }}>
+                        <span style={{ color: "rgba(232,131,106,0.4)" }}>{"✕"}</span>
+                        <span style={{ textDecoration: "line-through", opacity: 0.8 }}>{cardTitle}</span>
+                        {rc.reason && <span style={{ color: "rgba(255,255,255,0.3)", textDecoration: "none" }}>— {rc.reason}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Research jobs */}
               {r.research && r.research.length > 0 && (
                 <div style={{ padding: "0 4px" }}>
@@ -862,7 +1142,7 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
           );
         })}
 
-        {loading && (
+        {!historyView && loading && (
           <div style={{
             alignSelf: "flex-start",
             padding: "10px 14px",
@@ -878,7 +1158,8 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
         )}
       </div>
 
-      {/* Input area */}
+      {/* Input area — hidden when browsing history */}
+      {!historyView && (
       <div style={{
         padding: "12px 16px",
         borderTop: "1px solid rgba(255,255,255,0.04)",
@@ -947,6 +1228,7 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
           Enter to send · Fn Fn to dictate
         </div>
       </div>
+      )}
 
       <style>{`
         @keyframes wizard-spin {

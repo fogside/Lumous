@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useEffect, useRef } from "react";
+import { useReducer, useCallback, useEffect, useRef, startTransition } from "react";
 import { Board, Card, Goal, createCard } from "../lib/types";
 import { saveBoard, loadBoard, getBoardMtime } from "../lib/storage";
 
@@ -62,6 +62,12 @@ function boardReducer(state: Board | null, action: Action): Board | null {
         cards[cardId] = { ...cards[cardId], completedAt: null };
       }
 
+      // Clear wizard transient flags on any manual move — dragging a card is implicit acceptance/dismissal
+      if (cards[cardId]) {
+        const { proposed: _p, proposedReasoning: _pr, highlighted: _h, highlightReason: _hr, proposedDelete: _pd, proposedDeleteReason: _pdr, ...cleanCard } = cards[cardId];
+        cards[cardId] = cleanCard as typeof cards[typeof cardId];
+      }
+
       return { ...state, columns, cards, completionLog, ritualLog };
     }
 
@@ -88,12 +94,12 @@ function boardReducer(state: Board | null, action: Action): Board | null {
     }
 
     case "DELETE_CARD": {
-      const columns = state.columns.map((col) => {
-        if (col.id === action.columnId) {
-          return { ...col, cardIds: col.cardIds.filter((id) => id !== action.cardId) };
-        }
-        return col;
-      });
+      // Remove from ALL columns — card may have been moved by the wizard since the modal opened,
+      // so relying on columnId would leave an orphan card ID in the actual column
+      const columns = state.columns.map((col) => ({
+        ...col,
+        cardIds: col.cardIds.filter((id) => id !== action.cardId),
+      }));
       const cards = { ...state.cards };
       delete cards[action.cardId];
       return { ...state, columns, cards };
@@ -131,6 +137,7 @@ function boardReducer(state: Board | null, action: Action): Board | null {
       });
       const cards = { ...state.cards };
       for (const id of toRespawn) {
+        if (!cards[id]) continue; // card was deleted but ID still in completed column
         cards[id] = { ...cards[id], completedAt: null };
       }
       return { ...state, columns, cards };
@@ -142,14 +149,33 @@ function boardReducer(state: Board | null, action: Action): Board | null {
 
     case "ACCEPT_PROPOSAL": {
       const card = state.cards[action.cardId];
-      if (!card?.proposed) return state;
+      if (!card) return state;
+      if (card.proposedDelete) {
+        // Accept deletion: remove card + remove from all columns
+        const cards = { ...state.cards };
+        delete cards[action.cardId];
+        const columns = state.columns.map((col) => ({
+          ...col,
+          cardIds: col.cardIds.filter((id) => id !== action.cardId),
+        }));
+        return { ...state, cards, columns };
+      }
+      if (!card.proposed) return state;
+      // Accept new card: clear proposed flag
       const { proposed: _, proposedReasoning: __, ...rest } = card;
       return { ...state, cards: { ...state.cards, [action.cardId]: rest as Card } };
     }
 
     case "REJECT_PROPOSAL": {
       const card = state.cards[action.cardId];
-      if (!card?.proposed) return state;
+      if (!card) return state;
+      if (card.proposedDelete) {
+        // Reject deletion: keep the card, just clear the proposedDelete flag
+        const { proposedDelete: _, proposedDeleteReason: __, ...rest } = card;
+        return { ...state, cards: { ...state.cards, [action.cardId]: rest as Card } };
+      }
+      if (!card.proposed) return state;
+      // Reject new card: delete it
       const cards = { ...state.cards };
       delete cards[action.cardId];
       const columns = state.columns.map((col) => ({
@@ -160,29 +186,43 @@ function boardReducer(state: Board | null, action: Action): Board | null {
     }
 
     case "ACCEPT_ALL_PROPOSALS": {
-      const cards: Record<string, Card> = {};
-      for (const [id, card] of Object.entries(state.cards)) {
-        if (card.proposed) {
+      const cards: Record<string, Card> = { ...state.cards };
+      const deleteIds = new Set<string>();
+      for (const [id, card] of Object.entries(cards)) {
+        if (card.proposedDelete) {
+          delete cards[id];
+          deleteIds.add(id);
+        } else if (card.proposed) {
           const { proposed: _, proposedReasoning: __, ...rest } = card;
           cards[id] = rest as Card;
-        } else {
-          cards[id] = card;
         }
       }
-      return { ...state, cards };
+      if (deleteIds.size === 0) return { ...state, cards };
+      const columns = state.columns.map((col) => ({
+        ...col,
+        cardIds: col.cardIds.filter((id) => !deleteIds.has(id)),
+      }));
+      return { ...state, cards, columns };
     }
 
     case "REJECT_ALL_PROPOSALS": {
       const proposedIds = new Set(
         Object.entries(state.cards).filter(([, c]) => c.proposed).map(([id]) => id)
       );
-      if (proposedIds.size === 0) return state;
       const cards = { ...state.cards };
+      // Delete proposed-new cards
       for (const id of proposedIds) delete cards[id];
-      const columns = state.columns.map((col) => ({
-        ...col,
-        cardIds: col.cardIds.filter((id) => !proposedIds.has(id)),
-      }));
+      // Clear proposedDelete flag from pending-deletion cards
+      for (const [id, card] of Object.entries(cards)) {
+        if (card.proposedDelete) {
+          const { proposedDelete: _, proposedDeleteReason: __, ...rest } = card;
+          cards[id] = rest as Card;
+        }
+      }
+      if (proposedIds.size === 0 && !Object.values(state.cards).some((c) => c.proposedDelete)) return state;
+      const columns = proposedIds.size > 0
+        ? state.columns.map((col) => ({ ...col, cardIds: col.cardIds.filter((id) => !proposedIds.has(id)) }))
+        : state.columns;
       return { ...state, cards, columns };
     }
 
@@ -304,7 +344,8 @@ export function useBoard(
     dirtyRef.current = true;
 
     // Notify parent of live changes (for sidebar, shadow board, etc.)
-    onBoardChanged?.(board);
+    // startTransition: sidebar refresh is non-urgent and shouldn't block input
+    startTransition(() => { onBoardChanged?.(board); });
 
     clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
@@ -364,8 +405,11 @@ export function useBoard(
           const fresh = await loadBoard(boardId);
           suppressSaveRef.current = true;
           lastSetBoardRef.current = fresh;
-          dispatch({ type: "SET_BOARD", board: fresh });
-          onBoardChanged?.(fresh);
+          // Use startTransition so background file-change reloads don't block user input
+          startTransition(() => {
+            dispatch({ type: "SET_BOARD", board: fresh });
+            onBoardChanged?.(fresh);
+          });
         }
       } catch { /* file may not exist yet */ }
     }, 2500);

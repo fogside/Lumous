@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { DARK_INK, isLightBoard, getBoardTheme, TODAY_BOARD_ID } from "./lib/types";
 import { Sparkles } from "lucide-react";
 import { useBoards } from "./hooks/useBoards";
@@ -61,6 +61,18 @@ export default function App() {
   const [showWizard, setShowWizard] = useState(false);
   const [todayEditingCard, setTodayEditingCard] = useState<{ card: Board["cards"][string]; boardId: string } | null>(null);
 
+  // ALWAYS merge reducer's live board state into boards record.
+  // The reducer has the freshest card/column data for whichever board it holds
+  // (even after switching to Today Board — the effect hasn't flushed yet).
+  // useMemo: only recompute when board or boards actually change, not on unrelated App state changes
+  // NOTE: must be before any early returns to satisfy Rules of Hooks
+  const reducerBoardId = board?.id;
+  const allBoards = useMemo(() => {
+    return reducerBoardId && boards[reducerBoardId]
+      ? { ...boards, [reducerBoardId]: { ...board, title: boards[reducerBoardId].title, backgroundColor: boards[reducerBoardId].backgroundColor } }
+      : boards;
+  }, [boards, board, reducerBoardId]);
+
   if (loading) {
     return (
       <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: DARK_INK }}>
@@ -68,14 +80,6 @@ export default function App() {
       </div>
     );
   }
-
-  // ALWAYS merge reducer's live board state into boards record.
-  // The reducer has the freshest card/column data for whichever board it holds
-  // (even after switching to Today Board — the effect hasn't flushed yet).
-  const reducerBoardId = board?.id;
-  const allBoards = reducerBoardId && boards[reducerBoardId]
-    ? { ...boards, [reducerBoardId]: { ...board, title: boards[reducerBoardId].title, backgroundColor: boards[reducerBoardId].backgroundColor } }
-    : boards;
 
   const editingBoard = editingBoardId ? allBoards[editingBoardId] : null;
   const isCompact = mode === "compact";

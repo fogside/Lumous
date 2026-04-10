@@ -438,7 +438,7 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
         >
           <div style={{ display: "flex", gap: 12, height: "100%" }}>
             {visibleColumns.map((column) => {
-              const cards = column.cardIds
+              const cards = [...new Set(column.cardIds)]
                 .map((id) => board.cards[id])
                 .filter(Boolean);
               return (

@@ -75,3 +75,12 @@ export async function stripWizardTransient(): Promise<void> {
 export async function getBoardMtime(id: string): Promise<number> {
   return invoke<number>("get_board_mtime", { id });
 }
+
+export async function loadWizardHistory(boardId: string): Promise<import("./types").WizardConversation[]> {
+  const json = await invoke<string>("load_wizard_history", { boardId });
+  return JSON.parse(json);
+}
+
+export async function saveWizardHistory(boardId: string, conversations: import("./types").WizardConversation[]): Promise<void> {
+  await invoke("save_wizard_history", { boardId, data: JSON.stringify(conversations, null, 2) });
+}

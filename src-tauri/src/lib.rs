@@ -115,11 +115,13 @@ fn strip_wizard_transient(app: tauri::AppHandle) -> Result<(), String> {
                 changed = true;
             }
 
-            // Strip highlight fields from remaining cards
+            // Strip transient wizard fields from remaining cards
             for (_, card) in cards.iter_mut() {
                 if let Some(obj) = card.as_object_mut() {
                     if obj.remove("highlighted").is_some() { changed = true; }
                     if obj.remove("highlightReason").is_some() { changed = true; }
+                    if obj.remove("proposedDelete").is_some() { changed = true; }
+                    if obj.remove("proposedDeleteReason").is_some() { changed = true; }
                 }
             }
 
@@ -205,6 +207,21 @@ async fn run_claude(system_prompt: String, user_prompt: String) -> Result<String
 }
 
 #[tauri::command]
+fn load_wizard_history(app: tauri::AppHandle, board_id: String) -> Result<String, String> {
+    let path = get_data_path(&app).join(format!("wizard-history-{}.json", board_id));
+    match fs::read_to_string(&path) {
+        Ok(content) => Ok(content),
+        Err(_) => Ok("[]".to_string()),
+    }
+}
+
+#[tauri::command]
+fn save_wizard_history(app: tauri::AppHandle, board_id: String, data: String) -> Result<(), String> {
+    let path = get_data_path(&app).join(format!("wizard-history-{}.json", board_id));
+    fs::write(&path, data).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn get_board_mtime(app: tauri::AppHandle, id: String) -> Result<u64, String> {
     let path = get_data_path(&app).join("boards").join(format!("{}.json", id));
     let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
@@ -275,6 +292,8 @@ pub fn run() {
             run_claude,
             git_run,
             check_online,
+            load_wizard_history,
+            save_wizard_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

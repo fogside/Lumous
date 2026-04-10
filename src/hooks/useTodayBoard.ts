@@ -61,7 +61,7 @@ export function useTodayBoard(
         for (const cardId of col.cardIds) {
           if (seen.has(cardId)) continue;
           const card = board.cards[cardId];
-          if (!card || card.proposed) continue;
+          if (!card || card.proposed || card.proposedDelete) continue;
           // Include if: in today/in-progress, OR referenced by a session
           const isRelevantColumn = col.id === "today" || col.id === "in-progress";
           const isInSession = sessionCardIds.has(cardId);
@@ -300,7 +300,7 @@ export function useTodayBoard(
         console.error("Failed to complete card:", e);
       }
     },
-    [saveSessions, flushSave, refreshBoard, getLatestSessions],
+    [saveSessions, flushSave, refreshBoard, getLatestSessions, setBoardIfMatch],
   );
 
   // Uncomplete a card — move back to "today" on source board, unmark in session
@@ -336,7 +336,7 @@ export function useTodayBoard(
         console.error("Failed to uncomplete card:", e);
       }
     },
-    [saveSessions, flushSave, refreshBoard, getLatestSessions],
+    [saveSessions, flushSave, refreshBoard, getLatestSessions, setBoardIfMatch],
   );
 
   // Start a session — move all cards to "in-progress" on their source boards
@@ -382,7 +382,7 @@ export function useTodayBoard(
       );
       saveSessions(updated);
     },
-    [saveSessions, flushSave, refreshBoard, getLatestSessions],
+    [saveSessions, flushSave, refreshBoard, getLatestSessions, setBoardIfMatch],
   );
 
   // Check if all cards in a session are completed

@@ -106,26 +106,32 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
   const goalColor = card.goalId && goals ? goals.find((g) => g.id === card.goalId)?.color : undefined;
   const isProposed = !!card.proposed;
   const isHighlighted = !!card.highlighted;
+  const isProposedDelete = !!card.proposedDelete;
+  const isWizardCard = isProposed || isProposedDelete;
 
   // Compute border style
-  const borderStyle = isProposed
-    ? `2px dashed ${WIZARD_PURPLE}50`
-    : isHighlighted
-      ? `1px solid ${WIZARD_GOLD}40`
-      : theme.isLight
-        ? "none"
-        : card.label && labelColor
-          ? `1px solid ${labelColor}30`
-          : `1px solid ${theme.border}`;
+  const borderStyle = isProposedDelete
+    ? `2px dashed rgba(232,131,106,0.45)`
+    : isProposed
+      ? `2px dashed ${WIZARD_PURPLE}50`
+      : isHighlighted
+        ? `1px solid ${WIZARD_GOLD}40`
+        : theme.isLight
+          ? "none"
+          : card.label && labelColor
+            ? `1px solid ${labelColor}30`
+            : `1px solid ${theme.border}`;
 
   // Compute background
-  const bgStyle = isProposed
-    ? `linear-gradient(135deg, ${theme.surface} 60%, ${WIZARD_PURPLE}10 100%)`
-    : isHighlighted
-      ? `linear-gradient(135deg, ${theme.surface} 60%, ${WIZARD_GOLD}12 100%)`
-      : !theme.isLight && card.label && labelColor
-        ? `linear-gradient(135deg, ${theme.surface} 50%, ${labelColor}18 100%)`
-        : theme.surface;
+  const bgStyle = isProposedDelete
+    ? `linear-gradient(135deg, ${theme.surface} 60%, rgba(232,131,106,0.08) 100%)`
+    : isProposed
+      ? `linear-gradient(135deg, ${theme.surface} 60%, ${WIZARD_PURPLE}10 100%)`
+      : isHighlighted
+        ? `linear-gradient(135deg, ${theme.surface} 60%, ${WIZARD_GOLD}12 100%)`
+        : !theme.isLight && card.label && labelColor
+          ? `linear-gradient(135deg, ${theme.surface} 50%, ${labelColor}18 100%)`
+          : theme.surface;
 
   return (
     <div
@@ -136,19 +142,19 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
         borderRadius: 12,
         padding: "10px 14px",
         marginBottom: 8,
-        cursor: isProposed ? "default" : "grab",
+        cursor: isWizardCard ? "default" : "grab",
         background: bgStyle,
         border: borderStyle,
-        opacity: isDragging ? 0.4 : faded ? 0.4 : isProposed ? 0.85 : 1,
+        opacity: isDragging ? 0.4 : faded ? 0.4 : isWizardCard ? 0.85 : 1,
         overflow: "visible",
         userSelect: "none",
         position: "relative",
       }}
       data-no-drag
       data-card
-      {...(isProposed ? {} : attributes)}
-      {...(isProposed ? {} : listeners)}
-      onClick={isProposed ? undefined : onClick}
+      {...(isWizardCard ? {} : attributes)}
+      {...(isWizardCard ? {} : listeners)}
+      onClick={isWizardCard ? undefined : onClick}
     >
       {/* Clipped glow container — isolation forces own compositing layer
          so overflow:hidden+borderRadius clip survives parent transform */}
@@ -247,8 +253,67 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
         </div>
       )}
 
-      {/* Crescent label button — hidden on proposed cards */}
-      {!isProposed && (
+      {/* Proposed deletion: Delete / Keep buttons */}
+      {isProposedDelete && (
+        <div style={{
+          position: "absolute",
+          top: 5,
+          right: 5,
+          display: "flex",
+          gap: 4,
+          zIndex: 2,
+        }}>
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onAcceptProposal?.(card.id); }}
+            title="Confirm deletion"
+            style={{
+              height: 22,
+              paddingInline: 8,
+              borderRadius: 6,
+              border: "none",
+              background: "rgba(232,131,106,0.18)",
+              color: "rgba(232,131,106,0.9)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 11,
+              fontWeight: 600,
+              transition: "all 0.15s",
+            }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
+            </svg>
+            Delete
+          </button>
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onRejectProposal?.(card.id); }}
+            title="Keep card"
+            style={{
+              height: 22,
+              paddingInline: 8,
+              borderRadius: 6,
+              border: "none",
+              background: "rgba(100,200,100,0.1)",
+              color: "rgba(100,200,100,0.7)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              fontSize: 11,
+              fontWeight: 600,
+              transition: "all 0.15s",
+            }}
+          >
+            Keep
+          </button>
+        </div>
+      )}
+
+      {/* Crescent label button — hidden on wizard-managed cards */}
+      {!isWizardCard && (
         <button
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
@@ -328,7 +393,7 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
         </div>
       )}
 
-      <p style={{ fontSize: 15, color: theme.text, lineHeight: 1.5, fontWeight: 500, margin: 0, paddingRight: 18, overflowWrap: "break-word", wordBreak: "break-word" }}>
+      <p style={{ fontSize: 15, color: isProposedDelete ? "rgba(232,131,106,0.7)" : theme.text, lineHeight: 1.5, fontWeight: 500, margin: 0, paddingRight: isProposedDelete ? 100 : 18, overflowWrap: "break-word", wordBreak: "break-word", textDecoration: isProposedDelete ? "line-through" : "none" }}>
         {card.title}
       </p>
       {card.description && (
@@ -345,7 +410,19 @@ export function Card({ card, onClick, onLabelChange, faded, boardColor, theme, s
           {card.description}
         </p>
       )}
-      {/* Wizard reasoning / highlight reason */}
+      {/* Wizard reasoning / delete reason / highlight reason */}
+      {isProposedDelete && card.proposedDeleteReason && (
+        <p style={{
+          fontSize: 12,
+          color: "rgba(232,131,106,0.7)",
+          marginTop: 6,
+          lineHeight: 1.4,
+          fontStyle: "italic",
+          margin: "6px 0 0 0",
+        }}>
+          {card.proposedDeleteReason}
+        </p>
+      )}
       {isProposed && card.proposedReasoning && (
         <p style={{
           fontSize: 12,

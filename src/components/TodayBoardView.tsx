@@ -317,7 +317,9 @@ export function TodayBoardView({ boards, meta, updateSettings, flushSave, onNavi
     if (completedCount > prevCompletedRef.current) {
       setWizardKey((k) => k + 1);
       setShowCelebration(true);
-      setTimeout(() => setShowCelebration(false), 3000);
+      const t = setTimeout(() => setShowCelebration(false), 3000);
+      prevCompletedRef.current = completedCount;
+      return () => clearTimeout(t);
     }
     prevCompletedRef.current = completedCount;
   }, [completedCount]);
