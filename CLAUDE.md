@@ -62,6 +62,8 @@ src/
     ConfirmDialog.tsx        — Reusable confirmation dialog
     SparkleEffect.tsx        — Gold sparkle burst on cross-column drag
     WizardCelebration.tsx    — Wizard animation on task completion
+    SearchOverlay.tsx        — Global search (⌘K) across all boards
+    ErrorBoundary.tsx        — React error boundary with recovery UI
   hooks/
     useBoard.ts              — useReducer for single board state, auto-save
     useBoards.ts             — Meta/board list management, active board
@@ -69,6 +71,7 @@ src/
   lib/
     types.ts                 — Board, Card, Column, Meta, Settings, colors
     storage.ts               — Tauri invoke wrappers for Rust commands
+    logger.ts                — Logging to disk (logger.error/warn/info) + global error handlers
 src-tauri/
   src/lib.rs                 — Rust commands: file I/O, git operations
   capabilities/default.json  — Tauri permissions (window, shell)
@@ -201,8 +204,40 @@ Always use `allBoards` when you need any board's current state. `boards` alone m
 - **Changing `items` during drag**: @dnd-kit handles this if you follow the `onDragOver` → immediate `MOVE_CARD` → `onDragEnd` final-position pattern (already implemented)
 - **Card height changes during session**: if proposed cards (with extra buttons/text) are accepted mid-session, @dnd-kit may have stale measurements. Generally resolves on next drag.
 
+## Logging & Error Handling
+
+### Crash Log
+All uncaught JS errors, unhandled promise rejections, and drag-and-drop failures are logged to `app.log` in the data directory:
+- **Production**: `~/Library/Application Support/io.github.fogside.lumous/app.log`
+- **Dev**: `~/Library/Application Support/io.github.fogside.lumous-dev/app.log`
+
+Each entry has a timestamp and level: `[2026-04-16 12:34:56.789] [ERROR] Uncaught: ...`
+
+The log auto-caps at ~500KB by trimming old entries. Use `read_log` Rust command or `readLog()` from `storage.ts` to read it programmatically.
+
+### How it works
+- **`src/lib/logger.ts`**: `logger.error/warn/info(msg)` writes to disk via the Rust `write_log` command. `installGlobalErrorHandlers()` is called once at startup in `main.tsx` to catch `window.error` and `unhandledrejection`.
+- **`src/components/ErrorBoundary.tsx`**: React class component wrapping `<App />`. On crash, shows a recovery screen with error details (collapsible) + "Reload app" button instead of a black screen. Logs the error + component stack to disk.
+- **Drag-and-drop**: `handleDragOver` and `handleDragEnd` in `BoardView.tsx` are wrapped in try/catch — a drag crash logs the error and cleans up state (clears activeId, activeRect, dragSourceCol) so the app doesn't freeze.
+
+### Using the logger
+```typescript
+import { logger } from "../lib/logger";
+
+// Logs to app.log with timestamp + prints to console
+logger.error("Something broke: " + error.message);
+logger.warn("Unexpected state in reducer");
+logger.info("Board loaded: " + boardId);
+```
+
+### Wizard & Research Errors
+- **Wizard**: On Claude API failure, the error is shown as a prominent red card in the chat with a "Retry" button. The user's typed message is restored to the input field so they don't lose it.
+- **Research**: Errors are stored in `card.research.error` and shown on the card with a "Retry" button. The original `context` string is preserved in `card.research.context`.
+- Both translate raw errors into human-readable messages (auth, timeout, overloaded, CLI not found).
+
 ## Common Issues
 - **Port 1420 in use**: `lsof -ti :1420 | xargs kill -9`
 - **Cargo not found**: `export PATH="$HOME/.cargo/bin:$PATH"`
 - **Icon not updating in dev**: Icons only appear in production builds
 - **Window not dragging**: Check `core:window:allow-start-dragging` in capabilities
+- **App crashes / black screen**: Check `app.log` in the data dir (see Logging section above)

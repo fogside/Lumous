@@ -197,6 +197,14 @@ curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.t
 - [ ] Release notes include the curl install command
 - [ ] Updater endpoint returns the new version
 
+## Debugging post-release crashes
+
+If users report crashes after a release, check the app log:
+- **Production**: `~/Library/Application Support/io.github.fogside.lumous/app.log`
+- **Dev**: `~/Library/Application Support/io.github.fogside.lumous-dev/app.log`
+
+Entries are timestamped with level (ERROR/WARN/INFO). The ErrorBoundary catches React crashes and shows a recovery screen, so "black screen" crashes should now be extremely rare — but the log will still capture what happened.
+
 ## Fixing a release that's missing updater artifacts
 
 If a release was published without `latest.json` and `Lumous.app.tar.gz`, rebuild and upload:
