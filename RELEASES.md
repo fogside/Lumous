@@ -1,5 +1,21 @@
 # Releases
 
+## v2.0.5 — Crash Logging & Error Boundary
+
+*2026-04-16*
+
+- **Crash logging** — all uncaught errors, unhandled promise rejections, and drag-and-drop failures are logged to `app.log` in the data directory with timestamps
+- **Error boundary** — instead of a black screen on crash, shows a recovery screen with error details and a "Reload app" button
+- **Drag-and-drop resilience** — drag handlers are wrapped in try/catch so a drag crash cleans up state gracefully instead of freezing the app
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v2.0.4 — Global Search & Error Resilience
 
 *2026-04-16*

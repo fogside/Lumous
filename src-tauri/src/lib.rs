@@ -76,6 +76,31 @@ fn delete_board_file(app: tauri::AppHandle, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn write_log(app: tauri::AppHandle, level: String, message: String) -> Result<(), String> {
+    let log_path = get_data_path(&app).join("app.log");
+    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
+    let line = format!("[{}] [{}] {}\n", timestamp, level, message);
+    // Append to log file, cap at ~500KB by truncating old entries
+    let mut contents = fs::read_to_string(&log_path).unwrap_or_default();
+    contents.push_str(&line);
+    if contents.len() > 500_000 {
+        // Keep last 400KB
+        let start = contents.len() - 400_000;
+        contents = contents[start..].to_string();
+    }
+    fs::write(&log_path, contents).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_log(app: tauri::AppHandle) -> Result<String, String> {
+    let log_path = get_data_path(&app).join("app.log");
+    match fs::read_to_string(&log_path) {
+        Ok(content) => Ok(content),
+        Err(_) => Ok(String::new()),
+    }
+}
+
+#[tauri::command]
 fn get_data_dir(app: tauri::AppHandle) -> Result<String, String> {
     let path = get_data_path(&app);
     Ok(path.to_string_lossy().to_string())
@@ -294,6 +319,8 @@ pub fn run() {
             check_online,
             load_wizard_history,
             save_wizard_history,
+            write_log,
+            read_log,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

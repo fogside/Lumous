@@ -12,6 +12,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { Board, Card as CardType, CardLabel, getBoardTheme, BoardTheme } from "../lib/types";
+import { logger } from "../lib/logger";
 import { Column } from "./Column";
 import { CardModal } from "./CardModal";
 import { SparkleEffect, SparkleEvent } from "./SparkleEffect";
@@ -164,66 +165,77 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
   };
 
   const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
+    try {
+      const { active, over } = event;
+      if (!over) return;
 
-    const activeCardId = String(active.id);
-    const overId = String(over.id);
+      const activeCardId = String(active.id);
+      const overId = String(over.id);
 
-    const fromCol = findColumnForCard(activeCardId);
-    if (!fromCol) return;
+      const fromCol = findColumnForCard(activeCardId);
+      if (!fromCol) return;
 
-    const overColumn = board.columns.find((c) => c.id === overId);
-    const overCardCol = findColumnForCard(overId);
-    const toCol = overColumn || overCardCol;
+      const overColumn = board.columns.find((c) => c.id === overId);
+      const overCardCol = findColumnForCard(overId);
+      const toCol = overColumn || overCardCol;
 
-    if (!toCol || fromCol.id === toCol.id) return;
+      if (!toCol || fromCol.id === toCol.id) return;
 
-    const toIndex = overColumn
-      ? toCol.cardIds.length
-      : toCol.cardIds.indexOf(overId);
+      const toIndex = overColumn
+        ? toCol.cardIds.length
+        : toCol.cardIds.indexOf(overId);
 
-    moveCard(activeCardId, fromCol.id, toCol.id, Math.max(0, toIndex));
+      moveCard(activeCardId, fromCol.id, toCol.id, Math.max(0, toIndex));
+    } catch (e) {
+      logger.error(`DragOver crash: ${e instanceof Error ? `${e.message}\n${e.stack}` : e}`);
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-    setActiveRect(null);
+    try {
+      const { active, over } = event;
+      setActiveId(null);
+      setActiveRect(null);
 
-    if (!over) return;
+      if (!over) return;
 
-    const activeCardId = String(active.id);
-    const overId = String(over.id);
+      const activeCardId = String(active.id);
+      const overId = String(over.id);
 
-    const currentCol = findColumnForCard(activeCardId);
-    if (currentCol && dragSourceCol && currentCol.id !== dragSourceCol) {
-      const rect = (event.activatorEvent.target as HTMLElement)?.getBoundingClientRect?.();
-      const overRect = document.querySelector(`[data-column-id="${currentCol.id}"]`)?.getBoundingClientRect();
-      const ref = overRect || rect;
-      if (ref) {
-        setSparkleEvent({
-          x: ref.left + ref.width / 2,
-          y: ref.top + 60,
-          key: Date.now(),
-        });
+      const currentCol = findColumnForCard(activeCardId);
+      if (currentCol && dragSourceCol && currentCol.id !== dragSourceCol) {
+        const rect = (event.activatorEvent.target as HTMLElement)?.getBoundingClientRect?.();
+        const overRect = document.querySelector(`[data-column-id="${currentCol.id}"]`)?.getBoundingClientRect();
+        const ref = overRect || rect;
+        if (ref) {
+          setSparkleEvent({
+            x: ref.left + ref.width / 2,
+            y: ref.top + 60,
+            key: Date.now(),
+          });
+        }
+        if (currentCol.id === "completed") {
+          setWizardKey((k) => k + 1);
+          setShowWizard(true);
+          setTimeout(() => setShowWizard(false), 3000);
+        }
       }
-      if (currentCol.id === "completed") {
-        setWizardKey((k) => k + 1);
-        setShowWizard(true);
-        setTimeout(() => setShowWizard(false), 3000);
+      setDragSourceCol(null);
+
+      if (activeCardId === overId) return;
+
+      const col = findColumnForCard(activeCardId);
+      if (!col) return;
+
+      const overIndex = col.cardIds.indexOf(overId);
+      if (overIndex !== -1) {
+        moveCard(activeCardId, col.id, col.id, overIndex);
       }
-    }
-    setDragSourceCol(null);
-
-    if (activeCardId === overId) return;
-
-    const col = findColumnForCard(activeCardId);
-    if (!col) return;
-
-    const overIndex = col.cardIds.indexOf(overId);
-    if (overIndex !== -1) {
-      moveCard(activeCardId, col.id, col.id, overIndex);
+    } catch (e) {
+      logger.error(`DragEnd crash: ${e instanceof Error ? `${e.message}\n${e.stack}` : e}`);
+      setActiveId(null);
+      setActiveRect(null);
+      setDragSourceCol(null);
     }
   };
 
