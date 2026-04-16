@@ -1,5 +1,21 @@
 # Releases
 
+## v2.0.4 — Global Search & Error Resilience
+
+*2026-04-16*
+
+- **Global search (⌘K)** — search across all cards in all boards by keyword. Shows card title, description preview, label, board color, and column. Arrow keys + Enter or click to open
+- **Wizard error resilience** — when Claude fails (auth, timeout, overloaded), the error is shown clearly and your typed message is preserved in the input for easy retry
+- **Human-readable errors** — both wizard and card research now show friendly error messages instead of raw stack traces
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v2.0.3 — Wizard History & Bug Fixes
 
 *2026-04-10*

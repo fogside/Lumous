@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { DARK_INK, isLightBoard, getBoardTheme, TODAY_BOARD_ID } from "./lib/types";
 import { Sparkles } from "lucide-react";
 import { useBoards } from "./hooks/useBoards";
@@ -18,6 +18,7 @@ import { SyncSettingsModal } from "./components/SyncSettingsModal";
 import { WizardPanel } from "./components/WizardPanel";
 import { TodayBoardView } from "./components/TodayBoardView";
 import { CardModal } from "./components/CardModal";
+import { SearchOverlay } from "./components/SearchOverlay";
 
 export default function App() {
   const {
@@ -60,6 +61,19 @@ export default function App() {
   const [showWisps, setShowWisps] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
   const [todayEditingCard, setTodayEditingCard] = useState<{ card: Board["cards"][string]; boardId: string } | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+
+  // Global Cmd+K shortcut for search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setShowSearch((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // ALWAYS merge reducer's live board state into boards record.
   // The reducer has the freshest card/column data for whichever board it holds
@@ -306,6 +320,22 @@ export default function App() {
           }}
           onClose={() => setTodayEditingCard(null)}
           onStartResearch={(card, context) => startResearch(card, context, todayEditingCard.boardId)}
+        />
+      )}
+
+      {showSearch && (
+        <SearchOverlay
+          boards={allBoards}
+          onClose={() => setShowSearch(false)}
+          onNavigate={(boardId) => {
+            setActiveBoardId(boardId);
+            setShadowBoardId(null);
+            setShowSearch(false);
+          }}
+          onOpenCard={(card, boardId) => {
+            setTodayEditingCard({ card, boardId });
+            setShowSearch(false);
+          }}
         />
       )}
 

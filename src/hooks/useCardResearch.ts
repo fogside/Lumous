@@ -101,10 +101,17 @@ export function useCardResearch(
           }
         })
         .catch((err) => {
+          const errStr = String(err);
+          const friendly = errStr.includes("not found") || errStr.includes("ENOENT")
+            ? "Claude CLI not found — make sure `claude` is installed"
+            : errStr.includes("overloaded") ? "Claude is overloaded — try again in a moment"
+            : errStr.includes("401") || errStr.includes("authentication") ? "Authentication error — run `claude login`"
+            : errStr.includes("timeout") ? "Request timed out — try again"
+            : errStr;
           const errResearch: Card["research"] = {
             status: "error",
             context,
-            error: String(err),
+            error: friendly,
             startedAt: research.startedAt,
           };
           const latest = getCard(card.id);

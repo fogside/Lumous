@@ -401,7 +401,16 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
         saveCurrentConversation(newMsgs);
       }
     } catch (e) {
-      setMessages((prev) => [...prev, { role: "system", text: `Error: ${e}` }]);
+      const errStr = String(e);
+      const friendly = errStr.includes("not found") || errStr.includes("ENOENT")
+        ? "Claude CLI not found — make sure `claude` is installed and in PATH"
+        : errStr.includes("overloaded") ? "Claude is overloaded — try again in a moment"
+        : errStr.includes("401") || errStr.includes("authentication") ? "Authentication error — you may need to run `claude login`"
+        : errStr.includes("timeout") ? "Request timed out — try again"
+        : `Error: ${errStr}`;
+      setMessages((prev) => [...prev, { role: "system", text: friendly }]);
+      // Restore the user's message so they can retry without retyping
+      setInput(userText);
     } finally {
       setLoading(false);
     }
@@ -859,15 +868,36 @@ Include "sessions" when the user asks to plan their day, rearrange sessions, or 
           }
 
           if (msg.role === "system") {
+            const isError = !msg.text.startsWith("Remembered");
             return (
               <div key={i} style={{
                 textAlign: "center",
-                padding: "6px 12px",
-                color: msg.text.startsWith("Remembered") ? "rgba(180,138,192,0.5)" : "rgba(220,120,120,0.7)",
-                fontSize: 11,
+                padding: isError ? "10px 14px" : "6px 12px",
+                color: isError ? "rgba(232,131,106,0.9)" : "rgba(180,138,192,0.5)",
+                fontSize: isError ? 12 : 11,
                 fontStyle: "italic",
+                ...(isError ? {
+                  background: "rgba(232,131,106,0.08)",
+                  borderRadius: 10,
+                  border: "1px solid rgba(232,131,106,0.15)",
+                } : {}),
               }}>
-                {msg.text}
+                <div>{msg.text}</div>
+                {isError && input.trim() && (
+                  <button
+                    onClick={sendMessage}
+                    style={{
+                      marginTop: 8, fontSize: 11, fontWeight: 600,
+                      color: "rgba(255,255,255,0.7)", background: "rgba(255,255,255,0.08)",
+                      border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6,
+                      padding: "4px 12px", cursor: "pointer", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.14)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+                  >
+                    Retry
+                  </button>
+                )}
               </div>
             );
           }
