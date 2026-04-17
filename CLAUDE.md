@@ -31,7 +31,7 @@ TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/WandDo.key)" npm run tauri build
 ```
 
 ## Releasing
-1. Bump version in `src-tauri/tauri.conf.json`
+1. Bump version in **both** `src-tauri/tauri.conf.json` and `package.json` (must match — the in-app version display reads from `tauri.conf.json` via Vite define)
 2. Update `RELEASES.md` with changelog
 3. Build with signing: `TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/WandDo.key)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" npm run tauri build`
 4. Create `/tmp/latest.json` with new version, signature (from `.sig` file), download URL, and pub_date

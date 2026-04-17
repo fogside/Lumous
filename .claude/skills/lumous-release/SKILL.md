@@ -46,12 +46,14 @@ Before starting, make sure:
 
 ## Step 1: Bump the version
 
-Update the version in both places — they must match:
+Update the version in **both** places — they must match:
 
-| File | Field |
-|------|-------|
-| `package.json` | `"version"` |
-| `src-tauri/tauri.conf.json` | `"version"` |
+| File | Field | Used for |
+|------|-------|----------|
+| `src-tauri/tauri.conf.json` | `"version"` | Tauri binary version, updater, bundle names |
+| `package.json` | `"version"` | npm metadata (keep in sync) |
+
+**IMPORTANT**: The in-app version display (`v2.x.x` in the sidebar) reads from `src-tauri/tauri.conf.json` via Vite's `define` in `vite.config.ts`. If you forget to bump either file, the displayed version will be wrong. Always bump both.
 
 Use semantic versioning:
 - **Patch** (1.2.1 → 1.2.2): bug fixes, small tweaks
@@ -188,7 +190,7 @@ curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.t
 
 ## Checklist
 
-- [ ] Version bumped in `package.json` and `tauri.conf.json`
+- [ ] Version bumped in **both** `src-tauri/tauri.conf.json` and `package.json` (must match!)
 - [ ] `RELEASES.md` updated with changelog for this version
 - [ ] `TAURI_SIGNING_PRIVATE_KEY` set from `~/.tauri/WandDo.key`
 - [ ] `npm run tauri build` completed with "Finished 1 updater signature"
