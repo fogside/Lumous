@@ -202,6 +202,7 @@ Always use `allBoards` when you need any board's current state. `boards` alone m
   - `moveCards`: filter before unshift (`toCol.cardIds = toCol.cardIds.filter(id => id !== realId)`)
   - BoardView render: `[...new Set(column.cardIds)]` as safety net
 - **Changing `items` during drag**: @dnd-kit handles this if you follow the `onDragOver` → immediate `MOVE_CARD` → `onDragEnd` final-position pattern (already implemented)
+- **Infinite render loop (React #185)**: `onDragOver` fires continuously during a drag. If each `moveCard` dispatch triggers a re-render that triggers another `onDragOver` before state settles, React hits maximum update depth. **Fix**: `lastMoveRef` in `BoardView.tsx` deduplicates moves by `cardId:fromCol:toCol:index` key. Reset on drag start and drag end. Never remove this guard.
 - **Card height changes during session**: if proposed cards (with extra buttons/text) are accepted mid-session, @dnd-kit may have stale measurements. Generally resolves on next drag.
 
 ## Logging & Error Handling

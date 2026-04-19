@@ -1,5 +1,20 @@
 # Releases
 
+## v2.0.6 — Drag-and-Drop Stability
+
+*2026-04-19*
+
+- **Fix infinite render loop on cross-column drag** — dragging cards between columns could trigger React error #185 (maximum update depth exceeded) causing the app to crash to a black/error screen. Fixed by deduplicating `onDragOver` dispatches with a ref guard
+- **Version display fix** — in-app version now reads from `tauri.conf.json` (single source of truth) instead of `package.json`
+
+### Install
+
+```bash
+curl -sL https://github.com/fogside/Lumous/releases/latest/download/Lumous.app.tar.gz | tar xz -C /Applications && open /Applications/Lumous.app
+```
+
+---
+
 ## v2.0.5 — Crash Logging & Error Boundary
 
 *2026-04-16*
