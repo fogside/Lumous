@@ -155,6 +155,7 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
   const handleDragStart = (event: DragStartEvent) => {
     const cardId = String(event.active.id);
     setActiveId(cardId);
+    lastMoveRef.current = "";
     const col = findColumnForCard(cardId);
     setDragSourceCol(col?.id ?? null);
     const el = (event.active as unknown as { node: { current: HTMLElement | null } }).node?.current;
@@ -163,6 +164,9 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
       setActiveRect({ width: rect.width, height: rect.height });
     }
   };
+
+  // Track the last cross-column move to prevent infinite re-dispatch
+  const lastMoveRef = useRef<string>("");
 
   const handleDragOver = (event: DragOverEvent) => {
     try {
@@ -185,7 +189,15 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
         ? toCol.cardIds.length
         : toCol.cardIds.indexOf(overId);
 
-      moveCard(activeCardId, fromCol.id, toCol.id, Math.max(0, toIndex));
+      const idx = Math.max(0, toIndex);
+
+      // Skip if we already dispatched this exact move — prevents infinite render loop
+      // (React error #185) when onDragOver fires faster than state settles
+      const moveKey = `${activeCardId}:${fromCol.id}:${toCol.id}:${idx}`;
+      if (moveKey === lastMoveRef.current) return;
+      lastMoveRef.current = moveKey;
+
+      moveCard(activeCardId, fromCol.id, toCol.id, idx);
     } catch (e) {
       logger.error(`DragOver crash: ${e instanceof Error ? `${e.message}\n${e.stack}` : e}`);
     }
@@ -237,6 +249,7 @@ export function BoardView({ board, moveCard, addCard, updateCard, deleteCard, on
       setActiveRect(null);
       setDragSourceCol(null);
     }
+    lastMoveRef.current = "";
   };
 
   const activeCard = activeId ? board.cards[activeId] : null;
